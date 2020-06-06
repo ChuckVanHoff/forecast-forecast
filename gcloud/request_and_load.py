@@ -15,7 +15,7 @@ from pymongo.database import Database
 from pymongo.errors import ConnectionFailure, InvalidDocument, DuplicateKeyError, OperationFailure
 
 from config import OWM_API_key_loohoo as loohoo_key, OWM_API_key_masta as masta_key
-from config import port, host, user, password, socket_path
+from config import port, host, uri
 
 
 def read_list_from_file(filename):
@@ -44,12 +44,12 @@ def get_data_from_weather_api(owm, zipcode=None, coords=None):
     while result is None and tries < 4:
         try:
             if coords:
-                result = owm.three_hours_forecast_at_coords(**coords, allow_raw=True)
+                result = owm.three_hours_forecast_at_coords(**coords)
             elif zipcode:
                 result = owm.weather_at_zip_code(zipcode, 'us')
         except APIInvalidSSLCertificateError:
             loc = zipcode or 'lat: {}, lon: {}'.format(coords['lat'], coords['lon'])
-            print(f'SSL error with {loc} on attempt {tries} ...trying again')
+            print('SSL error with {loc} on attempt {tries} ...trying again')
             if coords:
                 owm_loohoo = OWM(loohoo_key)
                 owm = owm_loohoo
@@ -58,8 +58,13 @@ def get_data_from_weather_api(owm, zipcode=None, coords=None):
                 owm = owm_masta
         except APICallTimeoutError:
             loc = zipcode or 'lat: {}, lon: {}'.format(coords['lat'], coords['lon'])
-            print(f'Timeout error with {loc} on attempt {tries}... waiting 1 second then trying again')
+            print('Timeout error with {loc} on attempt {tries}... waiting 1 second then trying again')
             time.sleep(1)
+        except ValueError:
+            try:
+                print(result)
+            except:
+                print('valueError, then exception caught when trying to print result')
         tries += 1
     if tries == 4:
         print('tried 3 times without response; moving to the next step!')
@@ -158,16 +163,16 @@ def load_og(data, client, database, collection):
         updates = {'$push': {'forecasts': data}} # append the forecast object to the forecasts list
         try:
             # check to see if there is a document that fits the parameters. If there is, update it, if there isn't, upsert it
-            updated = col.find_one_and_update(filters, updates, upsert=True, return_document=ReturnDocument.AFTER)
+            col.find_one_and_update(filters, updates, upsert=True)
 #             col.find_one_and_update(filters, updates,  upsert=True)
             return
         except DuplicateKeyError:
-            return(f'DuplicateKeyError, could not insert data into {collection}.')
+            return('DuplicateKeyError, could not insert data into {collection}.')
     elif collection == 'observed' or collection == 'forecasted':
         try:
-            updated = col.insert_one(data)
+            col.insert_one(data)
         except DuplicateKeyError:
-            return(f'DuplicateKeyError, could not insert data into {collection}.')
+            return('DuplicateKeyError, could not insert data into {collection}.')
 
 def load_weather(data, client, database, collection):
     ''' Load data to specified database collection. This determines the appropriate way to process the load depending on the
@@ -187,22 +192,24 @@ def load_weather(data, client, database, collection):
     ''' 
     col = dbncol(client, collection, database=database)
     # decide how to handle the loading process depending on where the document will be loaded.
-    if collection == 'instant' or collection == 'test_instants':
+    if collection == 'instant' or collection == 'test_instants' or collection == 'instant_temp':
         # set the appropriate database collections, filters and update types
         if "Weather" in data:
-            updates = {'$set': {'weather': data}} # add the weather to the instant document
+            filters = {'zipcode':data['Weather'].pop('zipcode'), 'instant':data['Weather'].pop('instant')}            
+            updates = {'$set': {'weather': data['Weather']}}
         else:
+            filters = {'zipcode':data.pop('zipcode'), 'instant':data.pop('instant')}
             updates = {'$push': {'forecasts': data}} # append the forecast object to the forecasts list
         try:
             filters = {'zipcode':data.pop('zipcode'), 'instant':data.pop('instant')}
             col.find_one_and_update(filters, updates,  upsert=True)
         except DuplicateKeyError:
-            return(f'DuplicateKeyError, could not insert data into {collection}.')
+            return('DuplicateKeyError, could not insert data into {collection}.')
     elif collection == 'observed' or collection == 'forecasted' or collection == 'obs_temp' or collection == 'cast_temp':
         try:
             col.insert_one(data)
         except DuplicateKeyError:
-            return(f'DuplicateKeyError, could not insert data into {collection}.')
+            return('DuplicateKeyError, could not insert data into {collection}.')
 
 def request_and_load(codes):
     ''' Request weather data from the OWM api. Transform and load that data into a database.
@@ -212,25 +219,25 @@ def request_and_load(codes):
     '''
     # Begin a timer for the process and run the request and load process.
     start_start = time.time()
-    print(f'task began at {start_start}')
+    print('task began at {start_start}')
     i, n = 0, 0 # i for counting zipcodes processed and n for counting API calls made; API calls limited to a maximum of 60/minute/apikey.
     start_time = time.time()
     for code in codes:
         try:
             current = get_current_weather(code)
         except AttributeError:
-            print(f'got AttributeError while collecting current weather for {code}. Continuing to next code.')
+            print('got AttributeError while collecting current weather for {code}. Continuing to next code.')
             continue
         n+=1
         coords = current['coordinates']         
         try:
             forecasts = five_day(coords, code=code)
         except AttributeError:
-            print(f'got AttributeError while collecting forecasts for {code}. Continuing to next code.')
+            print('got AttributeError while collecting forecasts for {code}. Continuing to next code.')
             continue
         n+=1
-        load_weather(current, local_client, 'test', 'obs_temp')
-        load_weather(forecasts, local_client, 'test', 'cast_temp')
+        load_weather(current, local_client, 'owmap', 'obs_temp')
+        load_weather(forecasts, local_client, 'owmap', 'cast_temp')
         
         # if the api request rate is greater than 60 just keep going. Otherwise check how many requests have been made
         # and if it's more than 120 start make_instants.
@@ -245,22 +252,26 @@ def request_and_load(codes):
                 print('about to start making instants')
                 import make_instants # run the file that creates instants from the documents just loaded
                 if time.time() - start_time < 60:
-                    print(f'Waiting {start_time+60 - time.time()} seconds before resuming API calls.')
+                    print('Waiting {start_time+60 - time.time()} seconds before resuming API calls.')
                     time.sleep(start_time - time.time() + 60)
                     start_time = time.time()
-    print(f'task took {time.time() -  start_start} seconds and processed {i} zipcodes')
+    print('task took {time.time() -  start_start} seconds and processed {i} zipcodes')
 
 
 if __name__ == '__main__':
+
+    from make_instants import Client
+
     # this try block is to deal with the switching back and forth between computers with different directory names
     try:
-        directory = os.path.join(os.environ['HOME'], 'data', 'forcast-forcast')
-        filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
+        directory = os.path.join(os.environ['HOME'], 'forecast')
+        filename = os.path.join(directory, 'success_zipsNC.csv')
         codes = read_list_from_file(filename)
     except FileNotFoundError:
-        directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
-        filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
-        codes = read_list_from_file(filename)
-    local_client = MongoClient(host=host, port=port)
-    request_and_load(codes[:220])
-    local_client.close()
+        print('file not found')
+        # directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
+        # filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
+        # codes = read_list_from_file(filename)
+    client = Client(uri=uri)
+    request_and_load(codes)
+    client.close()

@@ -7,8 +7,7 @@ verify_ssl = true
 
 [packages]
 pyowm = {path = "../pyowm/dist/pyowm-2.10.0-py3-none-any.whl"}
-pandas = "*"
-bidict = "*"
+pymongo = "*"
 
 [requires]
 python_version = "3.7"
