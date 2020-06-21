@@ -3,6 +3,7 @@
 import time
 import json
 
+from benedict import benedict
 from pyowm import OWM
 from pyowm.weatherapi25.forecast import Forecast
 from pyowm.exceptions.api_response_error import NotFoundError
@@ -13,7 +14,6 @@ import overalls
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
 from instant import Instant
-
 
 class Weather:
     ''' A dictionary of weather variables and their observed/forecasted values
@@ -84,7 +84,9 @@ class Weather:
             'time_to_instant': 'DEFAULT'
         }
         ### Added new update function ###
-        weather = overalls.update_nested(weather, data)
+#         weather = overalls.update_nested(weather, data)
+        weather = benedict(weather)
+        weather.merge(data)
         
         self.type = _type
         self.loc = location
