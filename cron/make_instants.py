@@ -20,11 +20,6 @@ from config import user, password, socket_path
 
 
 # use the local host and port for all the primary operations
-port = 27017
-host = 'localhost'
-# use the remote host and port when the instant document is complete and is
-# ready for application
-password = quote(password)    # url encode the password for the mongodb uri
 uri = "mongodb+srv://%s:%s@%s" % (user, password, socket_path)
 print(uri)
 
