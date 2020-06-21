@@ -12,6 +12,8 @@ from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
 from config import port, host, user, password, socket_path
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 def get_and_make(codes):
     ''' Request weather data from the OWM api. Transform and load that data
     into a database.
@@ -70,11 +72,11 @@ if __name__ == '__main__':
     # This try block is to deal with the switching back and forth between
     # computers with different directory names.
     try:
-        directory = os.path.join(os.environ['HOME'], 'data', 'forcast-forcast')
+        directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
         filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
         codes = read_list_from_file(filename)
     except FileNotFoundError:
-        directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
+        directory = BASE_DIR
         filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
         codes = read_list_from_file(filename)
     client = MongoClient(host=host, port=port)
