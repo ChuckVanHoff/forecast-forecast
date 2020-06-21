@@ -16,12 +16,10 @@ from pymongo.errors import DuplicateKeyError, ConnectionFailure
 from pymongo.errors import InvalidDocument, OperationFailure, ConfigurationError
 from urllib.parse import quote
 
-from config import user, password, socket_path
-
-
+from config import uri
 # use the local host and port for all the primary operations
-uri = "mongodb+srv://%s:%s@%s" % (user, password, socket_path)
-print(uri)
+port = 27017
+host = 'localhost'
 
 
 def Client(host=None, port=None, uri=None):
