@@ -10,6 +10,7 @@ pyowm = {path = "../pyowm/dist/pyowm-2.10.0-py3-none-any.whl"}
 pandas = "*"
 python-benedict = "*"
 jupyterlab = "*"
+dnspython = "*"
 
 [requires]
 python_version = "3.7"
