@@ -9,12 +9,10 @@ from pyowm.exceptions.api_response_error import NotFoundError
 from pyowm.exceptions.api_call_error import APICallTimeoutError
 from pyowm.exceptions.api_call_error import APIInvalidSSLCertificateError
 
+import overalls
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
 from instant import Instant
-# from config import client
-
-# from Extract.make_instants import find_data
 
 
 class Weather:
@@ -39,7 +37,7 @@ class Weather:
 #         if _type == 'forecast' and 'reference_time' in data:
 #             self._id = f'{str(location)}{str(data["reference_time"])}'
 #         elif _type == 'observation': #and 'Weather' in data:
-#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}' #["Weather"]["reference_time"]//10800 + 1))}'
+#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
 #         self.as_dict = {'_id': self._id,
 #                        '_type': self.type,
 #                         'weather': self.weather
@@ -85,7 +83,8 @@ class Weather:
             'heat_index': 'DEFAULT',
             'time_to_instant': 'DEFAULT'
         }
-        weather.update(data)
+        ### Added new update function ###
+        weather = overalls.update_nested(weather, data)
         
         self.type = _type
         self.loc = location

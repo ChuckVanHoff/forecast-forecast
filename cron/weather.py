@@ -19,23 +19,83 @@ class Weather:
     for a given instant in time at a specified location.
     '''
     
-    def __init__(self, location, _type, data=None):
+### commented original so I could work on alterations ###
+#     def __init__(self, location, _type, data=None):
+#         '''
+#         :param location: can be either valid US zipcode or coordinate dictionary
+#         :type location: If this param is a zipcode, it should be str, otherwise
+#         dict
+#         :param _type: Indicates whether its data is observational or forecasted
+#         :type _type: string  It must be either 'observation' or 'forecast'
+#         '''
+
+#         self.type = _type
+#         self.loc = location
+#         self.weather = data
+#         # make the _id for each weather according to its reference time
+#         if _type == 'forecast' and 'reference_time' in data:
+#             self._id = f'{str(location)}{str(data["reference_time"])}'
+#         elif _type == 'observation': #and 'Weather' in data:
+#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}' #["Weather"]["reference_time"]//10800 + 1))}'
+#         self.as_dict = {'_id': self._id,
+#                        '_type': self.type,
+#                         'weather': self.weather
+#                        }
+    
+    ### COPY adding deafult weather object ###
+    def __init__(self, location, _type, data={}):
         '''
         :param location: can be either valid US zipcode or coordinate dictionary
         :type location: If this param is a zipcode, it should be str, otherwise
         dict
         :param _type: Indicates whether its data is observational or forecasted
         :type _type: string  It must be either 'observation' or 'forecast'
+        :param data: the data you want to update the defaults with
+        :type data: dict
         '''
 
+        # Create a default weather dict and update it with data.
+        weather = {
+            '_id': 'DEFAULT',
+            'clouds': 'DEFAULT',
+            'rain': {'1h': 0,
+                    '3h': 0
+                    },
+            'snow': {'1h': 0,
+                    '3h': 0
+                    },
+            'wind': {'speed': 0,
+                    'deg': 0
+                    },
+            'humidity': 'DEFAULT',
+            'pressure': {'press': 'DEFAULT',
+                        'sea_level': 'DEFAULT'
+                        },
+            'temperature': {'temp': 'DEFAULT',
+                           'temp_max': 'DEFAULT',
+                           'temp_min': 'DEFAULT'
+                           },
+            'status': 'DEFAULT',
+            'detailed_status': 'DEFAULT',
+            'weather_code': 'DEFAULT',
+            'visibility_distance': 0,
+            'dewpoint': 'DEFAULT',
+            'humidex': 'DEFAULT',
+            'heat_index': 'DEFAULT',
+            'time_to_instant': 'DEFAULT'
+        }
+        weather.update(data)
+        
         self.type = _type
         self.loc = location
-        self.weather = data
+        self.weather = weather#.update(data)
         # make the _id for each weather according to its reference time
         if _type == 'forecast' and 'reference_time' in data:
             self._id = f'{str(location)}{str(data["reference_time"])}'
         elif _type == 'observation' and 'Weather' in data:
-            self._id = f'{str(location)}{str(10800 * (data["Weather"]["reference_time"]//10800 + 1))}'
+            self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}' #["Weather"]["reference_time"]//10800 + 1))}'
+        else:
+            self._id = weather['_id']    
         self.as_dict = {'_id': self._id,
                        '_type': self.type,
                         'weather': self.weather

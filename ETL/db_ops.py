@@ -8,8 +8,10 @@ from pymongo.collection import Collection, ReturnDocument
 from pymongo.errors import ConnectionFailure, InvalidDocument, DuplicateKeyError, OperationFailure, ConfigurationError
 from urllib.parse import quote
 
-# from config import user, password, socket_path, host, port
-database = 'test'
+# from config import user, password, socket_path, 
+from . import config
+# from config import host, port
+# from config import database
 
 def Client(host=None, port=None, uri=None):
     ''' Create and return a pymongo MongoClient object. Connect with the given parameters if possible, switch to local if the

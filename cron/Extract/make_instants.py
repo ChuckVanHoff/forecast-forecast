@@ -17,17 +17,10 @@ from pymongo.errors import DuplicateKeyError, ConfigurationError
 from urllib.parse import quote
 
 from config import user, password, socket_path
-from ETL.db_ops import Client
-
-
+from config import uri
 # use the local host and port for all the primary operations
 port = 27017
 host = 'localhost'
-# Use the remote host and port when the instant document is complete and is ready
-# for application
-password = quote(password)    # url encode the password for the mongodb uri
-uri = "mongodb+srv://%s:%s@%s" % (user, password, socket_path)
-print(f'from Extract.config {uri}')
 
 
 def dbncol(client, collection, database='test'):
@@ -314,5 +307,5 @@ def make_instants(client):
     copy_docs(obs_col, database, 'obs_archive', delete=True)
 
 
-client = MongoClient(host=host, port=port)
-remote_client = Client(uri)
+# client = MongoClient(host=host, port=port)
+# remote_client = Client(uri)
