@@ -64,7 +64,8 @@ class Weather:
                     '3h': 0
                     },
             'wind': {'speed': 0,
-                    'deg': 0
+                    'deg': 0,
+                     'gust': 0
                     },
             'humidity': 'DEFAULT',
             'pressure': {'press': 'DEFAULT',
