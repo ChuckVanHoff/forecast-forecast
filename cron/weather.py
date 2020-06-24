@@ -3,16 +3,17 @@
 import time
 import json
 
+from benedict import benedict
 from pyowm import OWM
 from pyowm.weatherapi25.forecast import Forecast
 from pyowm.exceptions.api_response_error import NotFoundError
 from pyowm.exceptions.api_call_error import APICallTimeoutError
 from pyowm.exceptions.api_call_error import APIInvalidSSLCertificateError
 
+import overalls
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
 from instant import Instant
-
 
 class Weather:
     ''' A dictionary of weather variables and their observed/forecasted values
@@ -36,7 +37,7 @@ class Weather:
 #         if _type == 'forecast' and 'reference_time' in data:
 #             self._id = f'{str(location)}{str(data["reference_time"])}'
 #         elif _type == 'observation': #and 'Weather' in data:
-#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}' #["Weather"]["reference_time"]//10800 + 1))}'
+#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
 #         self.as_dict = {'_id': self._id,
 #                        '_type': self.type,
 #                         'weather': self.weather
@@ -50,8 +51,6 @@ class Weather:
         dict
         :param _type: Indicates whether its data is observational or forecasted
         :type _type: string  It must be either 'observation' or 'forecast'
-        :param data: the data you want to update the defaults with
-        :type data: dict
         '''
 
         # Create a default weather dict and update it with data.
@@ -65,7 +64,8 @@ class Weather:
                     '3h': 0
                     },
             'wind': {'speed': 0,
-                    'deg': 0
+                    'deg': 0,
+                     'gust': 0
                     },
             'humidity': 'DEFAULT',
             'pressure': {'press': 'DEFAULT',
@@ -84,10 +84,14 @@ class Weather:
             'heat_index': 'DEFAULT',
             'time_to_instant': 'DEFAULT'
         }
-        weather.update(data)
+        ### Added new update function ###
+#         weather = overalls.update_nested(weather, data)
+        weather = benedict(weather)
+        weather.merge(data)
         
         self.type = _type
         self.loc = location
+        # Define the weather data structure
         self.weather = weather#.update(data)
         # make the _id for each weather according to its reference time
         if _type == 'forecast' and 'reference_time' in data:
@@ -114,14 +118,18 @@ class Weather:
         if not instants:
             instants = {'init': 'true'}
         if self.type == 'observation':
+#             print('setting something as observation')
             instants.setdefault(self._id, Instant(self._id, observations=self.weather))
             return
         if self.type == 'forecast':
+#             print('setting something as forecast')
             instants.setdefault(self._id, Instant(self._id)).casts.append(self.weather)
+#             instants.setdefault(self._id, Instant(self._id))['forecasts'].append(self.weather)
+#             instants[self._id]['forecasts'].append(weather)
             return
 
 
-def get_data_from_weather_api(owm, location):
+def get_data_from_weather_api(owm, location, current=False):
     ''' Makes api calls for observations and forecasts and handles the API call
     errors.
 
@@ -130,17 +138,24 @@ def get_data_from_weather_api(owm, location):
     :param location: the coordinates or zipcode reference for the API call.
     :type location: if location is a zipcode, then type is a string;
     if location is a coordinates, then tuple or dict.
+    :param current: This determines if the coordinate location should be used
+    to get current or forecasted weather. The default is forecasted.
+    :type current: bool
 
     returns: the API data
     '''
-    
+        
     result = None
     tries = 1
     while result is None and tries < 4:
         try:
             if type(location) == dict:
-                result = owm.three_hours_forecast_at_coords(**location)
-                return result
+                if current:
+                    result = owm.weather_at_coords(**location)
+                    return result
+                else:
+                    result = owm.three_hours_forecast_at_coords(**location)
+                    return result
             elif type(location) == str:
                 result = owm.weather_at_zip_code(location, 'us')
                 return result
@@ -185,16 +200,18 @@ def get_current_weather(location):
     while m < 4:
         try:
             # get the raw data from the OWM and make a Weather from it
+            if type(location) == dict:
+                result = get_data_from_weather_api(owm, location, coords=location)
             result = get_data_from_weather_api(owm, location)
-            if result is -1:
-                print(f'Did not get current weather for {location}; reset owm')
+            if result == -1:
+                print(f'Did not get current weather for {location} and reset owm')
                 return result
-            result = json.loads(result.to_JSON())   # the current weather for
-                                                    # the given zipcode
-            result['Weather']['location'] = result['Location'].pop('coordinates')
+            result = json.loads(result.to_JSON())  # the current weather for the given zipcode
+            coordinates = result['Location'].pop('coordinates')
+            result['Weather']['location'] = coordinates
             result.pop('reception_time')
             result.pop('Location')
-            weather = Weather(location, 'observation', result)
+            weather = Weather(coordinates, 'observation', result['Weather'])
             return weather
         except APICallTimeoutError:
             owm = owm_loohoo
@@ -222,3 +239,15 @@ def five_day(location):
         instant = data['reference_time']
         casts.append(Weather(location, 'forecast', data))
     return casts
+
+
+# from Extract.make_instants import find_data
+# # set database and collection for testing
+# database = 'test'
+# collection = 'instant_temp'
+# # create a dict to hold the instants pulled from the database
+# instants = {}
+# data = find_data(client, database, collection)
+# # add each doc to instants and set its key and _id to the same values
+# for item in data:
+#     instants[f'{item["_id"]}'] = item['_id']
