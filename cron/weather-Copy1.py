@@ -10,6 +10,7 @@ from pyowm.exceptions.api_response_error import NotFoundError
 from pyowm.exceptions.api_call_error import APICallTimeoutError
 from pyowm.exceptions.api_call_error import APIInvalidSSLCertificateError
 
+import overalls
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
 from instant import Instant
@@ -172,12 +173,13 @@ def get_data_from_weather_api(owm, location, current=False):
         except APICallTimeoutError:
             loc = location or 'lat: {}, lon: {}'.format(location['lat'],
                                                            location['lon'])
-            print(f'''Timeout error with {loc} on attempt {tries}... waiting /
-            1 second then trying again''')
+            print(f'''Timeout error with {loc} on attempt {tries}... waiting 1
+                  second then trying again''')
             time.sleep(1)
         tries += 1
     if tries == 4:
-        print('''tried 3 times without response; moving to the next location.''')
+        print('''tried 3 times without response; breaking out and causing an
+        error that will crash your current colleciton process...fix that!''')
         return -1  ### sometime write something to keep track of the zip and
                 ### instant that isn't collected ###
 
