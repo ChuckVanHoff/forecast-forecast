@@ -7,10 +7,11 @@ from pymongo.database import Database
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
 from pymongo.errors import InvalidDocument, OperationFailure, ConfigurationError
-from urllib.parse import quote
+### no need to have the url encoding anymore
+# from urllib.parse import quote
 
-
-database = 'test'
+### removed this line ###
+# database = 'test'
 
 
 def check_db_access(client):
@@ -76,7 +77,7 @@ def Client(uri):
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database=database):
+def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -119,7 +120,7 @@ def load(data, client, database, collection):
     :type collection: str
     '''
 
-    col = dbncol(client, collection, database=database)
+    col = dbncol(client, collection, database) ###=database) this is not needed after removing it from the func def
 
     # set the appropriate database collections, filters and update types
     if collection == 'instant':
@@ -131,7 +132,10 @@ def load(data, client, database, collection):
             return col.find_one_and_update(filters, updates,  upsert=True)
         except DuplicateKeyError:
             return(f'DuplicateKeyError, could not insert data to {collection}')
-    elif collection == 'observed' or collection == 'forecasted':
+    elif collection == 'observed' \
+        or collection == 'forecasted' \
+        or collection == 'obs_temp' \
+        or collection == 'cast_temp':
         try:
             col.insert_one(data)
             return
@@ -154,7 +158,7 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     :param destination_col: the collection you want the documents copied into
     :type destination_col: a pymongo.collection.Collection object
     :param destination_db: the database you want the documents copied into
-    :type destination_db: a pymongo database pymongo.databse.Database
+    :type destination_db: a pymongo database pymongo.database.Database
     :param filters: a filter for the documents to be copied from the collection
     By default all collection docs will be copied
     :type filters: dict
@@ -164,10 +168,13 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     copy = []
     for item in original:
         copy.append(item)
-    destination = dbncol(client, collection=destination_col, database=destination_db)
-    inserted_ids = destination.insert_many(copy).inserted_ids # inserted IDs 
+        
+    database = destination_db     # Define database and collection
+    collection = destination_col  # for the following operations.
+    destination = dbncol(client, collection, database)
+    inserted_ids = destination.insert_many(copy).inserted_ids
     if delete == True:
-        # remove all the documents from the origin collection
+        # remove all the inserted documents from the origin collection.
         for item in inserted_ids:
             filter = {'_id': item}
             col.delete_one(filter)
