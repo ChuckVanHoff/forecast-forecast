@@ -94,7 +94,6 @@ def dbncol(client, collection, database=database):
 
     try:
         db = Database(client, database)
-        print(f'dbncol created db without AttributeError using {client}.')
     except AttributeError:
         print(f'dbncol caught AttributeError while trying to connect {client}.')
         from config import uri
