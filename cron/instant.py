@@ -85,12 +85,14 @@ def sweep(instants):
     import time
     
     import pymongo
+    from pymongo import MongoClient
     from pymongo.cursor import Cursor
     from Extract.make_instants import find_data
-    from config import client, database
-    from db_ops import dbncol
+    import config
+    import db_ops
     
-    col = dbncol(client, 'instant_temp', database=database)
+    client = MongoClient('localhost', 27017)
+    col = db_ops.dbncol(client, 'instant_temp', config.database)
     n = 0
     # Check the instant type- it could be a dict if it came from the database,
     # or it could be a list if it's a bunch of instant objects, or a pymongo
@@ -132,23 +134,27 @@ def find_legit(instants):
 
 def load_legit(legit_list):
     ''' Load the 'legit' instants to the remote database and delete from temp.
-    This process does not delete the 
+    This process does not delete the documents upon insertion, but rather holds
+    it until the next time, tries to load it then, and finally, when getting a duplicate
+    key error, deletes the document from its temporary location.
 
     :param collection: the collection you want to pull instants from
     :type collection: pymongo.collection.Collection
     '''
 
+    from pymongo import MongoClient
     from pymongo.errors import DuplicateKeyError
 
     import config
-    from config import remote_client
-    from config import client
-    from config import database
-    from db_ops import dbncol
+#     from config import remote_client
+#     from config import client
+#     from config import database
+#     from db_ops import dbncol
+    import db_ops
     
-### this should load to the remote_client.owmap.legit_inst for production ###
-    remote_col = dbncol(remote_client, 'legit_inst', database=database)
-    col = dbncol(client, 'instant_temp', database=database)
+    client = MongoClient('localhost', 27017)
+    remote_col = db_ops.dbncol(db_ops.Client(config.uri),'legit_inst', config.database)
+    col = dbncol(client, 'instant_temp', config.database)
     # col = dbncol(client, 'legit_inst', database=database)
     try:
         check = remote_col.insert_one(legit_list)
@@ -176,7 +182,9 @@ if __name__ == '__main__':
     import db_ops
 
     collection = 'instant_temp'
-    col = db_ops.dbncol(config.client, collection, database=config.database)
+    col = db_ops.dbncol(db_ops.Client(config.uri),
+                        collection,
+                        config.database)
     cast_count_all(col.find({}))
     sweep(col.find({}))
     print(f'Total op time for instant.py was {time.time()-start_time} seconds')
