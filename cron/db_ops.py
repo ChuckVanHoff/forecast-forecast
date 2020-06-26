@@ -95,10 +95,10 @@ def dbncol(client, collection, database): ###=database): I don't think this is n
 
     try:
         db = Database(client, database)
-    except AttributeError:
+    except AttributeError as e:
         print(f'dbncol caught AttributeError while trying to connect {client}.')
+        print(e, '...trying to connect with the remote, if I can.')
         from config import uri
-        print('trying to connect using MongoClient rather than my own Client()')
         client = MongoClient(uri)
         db = Database(client, database)
         print('did it without issue.')
@@ -120,7 +120,7 @@ def load(data, client, database, collection):
     :type collection: str
     '''
 
-    col = dbncol(client, collection, database) ###=database) this is not needed after removing it from the func def
+    col = dbncol(client, collection, database)
 
     # set the appropriate database collections, filters and update types
     if collection == 'instant':
