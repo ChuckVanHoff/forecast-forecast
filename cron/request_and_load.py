@@ -17,6 +17,7 @@ from pymongo.database import Database
 from pymongo.errors import ConnectionFailure, InvalidDocument
 from pymongo.errors import DuplicateKeyError, OperationFailure
 
+import db_ops
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
 from config import port, host, user, password, socket_path
@@ -31,126 +32,130 @@ def read_list_from_file(filename):
     with open(filename, "r") as z_list:
         return z_list.read().strip().split(',')
 
-def get_data_from_weather_api(owm, zipcode=None, coords=None):
-    ''' Makes api calls for observations and forecasts and handles the API call
-    errors.
+### THIS FUNCTION IS IN THE weAther.py MODULE ###
+# def get_data_from_weather_api(owm, zipcode=None, coords=None):
+#     ''' Makes api calls for observations and forecasts and handles the API call
+#     errors.
 
-    :param owm: the OWM API object
-    :type owm: pyowm.OWM
-    :param zipcode: the zipcode reference for the API call
-    :type zipcode: string
-    :param coords: the latitude and longitude coordinates reference for the API
-    :type coords: 2-tuple 
+#     :param owm: the OWM API object
+#     :type owm: pyowm.OWM
+#     :param zipcode: the zipcode reference for the API call
+#     :type zipcode: string
+#     :param coords: the latitude and longitude coordinates reference for the API
+#     :type coords: 2-tuple 
 
-    returns: the API data
-    '''
-    result = None
-    tries = 1
-    while result is None and tries < 4:
-        try:
-            if coords:
-                result = owm.three_hours_forecast_at_coords(**coords)
-            elif zipcode:
-                result = owm.weather_at_zip_code(zipcode, 'us')
-        except APIInvalidSSLCertificateError:
-            loc = zipcode or 'lat: {}, lon: {}'.format(coords['lat'], coords['lon'])
-            print(f'SSL error with {loc} on attempt {tries} ...trying again')
-            if coords:
-                owm_loohoo = OWM(loohoo_key)
-                owm = owm_loohoo
-            elif zipcode:
-                owm_masta = OWM(masta_key)
-                owm = owm_masta
-        except APICallTimeoutError:
-            loc = zipcode or 'lat: {}, lon: {}'.format(coords['lat'], coords['lon'])
-            print(f'Timeout error with {loc} on attempt {tries}... waiting 1\
-                second then trying again')
-            time.sleep(1)
-        except ValueError:
-            try:
-                print(result)
-            except:
-                print('valueError, then exception caught when trying to print\
-                    result')
-        tries += 1
-    if tries == 4:
-        print('tried 3 times without response; moving to the next step!')
-        return
-    return result
+#     returns: the API data
+#     '''
+#     result = None
+#     tries = 1
+#     while result is None and tries < 4:
+#         try:
+#             if coords:
+#                 result = owm.three_hours_forecast_at_coords(**coords)
+#             elif zipcode:
+#                 result = owm.weather_at_zip_code(zipcode, 'us')
+#         except APIInvalidSSLCertificateError:
+#             loc = zipcode or 'lat: {}, lon: {}'.format(coords['lat'], coords['lon'])
+#             print(f'SSL error with {loc} on attempt {tries} ...trying again')
+#             if coords:
+#                 owm_loohoo = OWM(loohoo_key)
+#                 owm = owm_loohoo
+#             elif zipcode:
+#                 owm_masta = OWM(masta_key)
+#                 owm = owm_masta
+#         except APICallTimeoutError:
+#             loc = zipcode or 'lat: {}, lon: {}'.format(coords['lat'], coords['lon'])
+#             print(f'Timeout error with {loc} on attempt {tries}... waiting 1\
+#                 second then trying again')
+#             time.sleep(1)
+#         except ValueError:
+#             try:
+#                 print(result)
+#             except:
+#                 print('valueError, then exception caught when trying to print\
+#                     result')
+#         tries += 1
+#     if tries == 4:
+#         print('tried 3 times without response; moving to the next step!')
+#         return
+#     return result
 
-def get_current_weather(code=None, coords=None):
-    ''' Get the current weather for the given zipcode or coordinates.
+### THIS FUNCTION IS IN THE weAther.py MODULE ###
+# def get_current_weather(code=None, coords=None):
+#     ''' Get the current weather for the given zipcode or coordinates.
 
-    :param code: the zip code to find weather data about
-    :type code: string
-    :param coords: the coordinates for the data you want
-    :type coords: 2-tuple
+#     :param code: the zip code to find weather data about
+#     :type code: string
+#     :param coords: the coordinates for the data you want
+#     :type coords: 2-tuple
 
-    :return: the raw weather object
-    :type: json
-    '''
-    owm = OWM(loohoo_key)
+#     :return: the raw weather object
+#     :type: json
+#     '''
+#     owm = OWM(loohoo_key)
 
-    try:
-        result = get_data_from_weather_api(owm, zipcode=code)
-    except APICallTimeoutError:
-        owm = OWM(loohoo_key)
-    current = json.loads(result.to_JSON()) # the current weather for the given
-                                            # zipcode
-    if code:
-        current['Weather']['zipcode'] = code
-    current['coordinates'] = current['Location']['coordinates']
-    current['Weather']['instant'] = 10800*(current['Weather']['reference_time']//10800 + 1)
-    current['Weather']['time_to_instant'] = current['Weather']['instant'] - current['Weather'].pop('reference_time')
-    current.pop('Location')
-    return current
+#     try:
+#         result = get_data_from_weather_api(owm, zipcode=code)
+#     except APICallTimeoutError:
+#         owm = OWM(loohoo_key)
+#     current = json.loads(result.to_JSON()) # the current weather for the given
+#                                             # zipcode
+#     if code:
+#         current['Weather']['zipcode'] = code
+#     current['coordinates'] = current['Location']['coordinates']
+#     current['Weather']['instant'] = 10800*(current['Weather']['reference_time']//10800 + 1)
+#     current['Weather']['time_to_instant'] = current['Weather']['instant'] - current['Weather'].pop('reference_time')
+#     current.pop('Location')
+#     return current
 
-def five_day(coords, code=None):
-    ''' Get each weather forecast for the corrosponding coordinates
+### THIS FUNCTION IS IN THE weAther.py MODULE ###
+# def five_day(coords, code=None):
+#     ''' Get each weather forecast for the corrosponding coordinates
     
-    :param coords: the latitude and longitude for which that that weather is
-    being forecasted
-    :type coords: tuple containing the latitude and logitude for the forecast
+#     :param coords: the latitude and longitude for which that that weather is
+#     being forecasted
+#     :type coords: tuple containing the latitude and logitude for the forecast
 
-    :return five_day: the five day, every three hours, forecast for the zipcode
-    :type five_day: dict
-    '''
-    owm = OWM(masta_key)
+#     :return five_day: the five day, every three hours, forecast for the zipcode
+#     :type five_day: dict
+#     '''
+#     owm = OWM(masta_key)
 
-    Forecast = get_data_from_weather_api(owm, coords=coords).get_forecast()
-    forecast = json.loads(Forecast.to_JSON())
-    if code:
-        forecast['zipcode'] = code
-    if coords:
-        forecast['coordinates'] = coords
-    forecast.pop('Location')
-    forecast.pop('interval')
-    reception_time = forecast['reception_time']  # to add to weathers array
-    for cast in forecast['weathers']:
-        cast['zipcode'] = forecast['zipcode']
-        cast['instant'] = cast.pop('reference_time')
-        cast['time_to_instant'] = cast['instant'] - reception_time
-    return forecast
+#     Forecast = get_data_from_weather_api(owm, coords=coords).get_forecast()
+#     forecast = json.loads(Forecast.to_JSON())
+#     if code:
+#         forecast['zipcode'] = code
+#     if coords:
+#         forecast['coordinates'] = coords
+#     forecast.pop('Location')
+#     forecast.pop('interval')
+#     reception_time = forecast['reception_time']  # to add to weathers array
+#     for cast in forecast['weathers']:
+#         cast['zipcode'] = forecast['zipcode']
+#         cast['instant'] = cast.pop('reference_time')
+#         cast['time_to_instant'] = cast['instant'] - reception_time
+#     return forecast
 
-def dbncol(client, collection, database='test'):
-    ''' Make a connection to the database and collection given in the arguments
+### THIS FUNCTION IS IN THE MODULE db_ops.py ###
+# def dbncol(client, collection, database='test'):
+#     ''' Make a connection to the database and collection given in the arguments
 
-    :param client: a MongoClient instance
-    :type client: pymongo.MongoClient
-    :param database: the name of the database to be used. It must be a database
-    name present at the client
-    :type database: str
-    :param collection: the database collection to be used.  It must be a
-    collection name present in the database
-    :type collection: str
+#     :param client: a MongoClient instance
+#     :type client: pymongo.MongoClient
+#     :param database: the name of the database to be used. It must be a database
+#     name present at the client
+#     :type database: str
+#     :param collection: the database collection to be used.  It must be a
+#     collection name present in the database
+#     :type collection: str
     
-    :return col: the collection to be used
-    :type: pymongo.collection.Collection
-    '''
+#     :return col: the collection to be used
+#     :type: pymongo.collection.Collection
+#     '''
 
-    db = Database(client, database)
-    col = Collection(db, collection)
-    return col
+#     db = Database(client, database)
+#     col = Collection(db, collection)
+#     return col
 
 def load_og(data, client, database, collection):
     # Legacy function...see load_weather() for loading needs
@@ -208,7 +213,7 @@ def load_weather(data, client, database, collection):
     :param collection: the database collection to be used
     :type collection: str
     ''' 
-    col = dbncol(client, collection, database=database)
+    col = db_ops.dbncol(client, collection, database=database)
     # decide how to handle the loading process depending on where the document
     # will be loaded.
     if collection == 'instant' or collection == 'test_instants' or collection == 'instant_temp':

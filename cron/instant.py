@@ -1,7 +1,14 @@
-''' Defines the Instant class and some useful functions. '''
+''' Defines the Instant class and some useful functions. When executed as main
+this module will search the database for completed and incompletable Instants
+and move the completed to a remote database-collection, legit_inst, and delete
+all the incompletable instants.'''
 
 
 class Instant:
+    ''' The Instant is an object built out of a collection of Weathers: in the
+    case of forecast-forecast there are 40 forecast dictionaries contained in a
+    list and one observation dictionary for comparison.
+    '''
 
     def __init__(self, _id, forecasts=[], observations={}):
         
@@ -22,10 +29,11 @@ class Instant:
     @property
     def itslegit(self):
         ''' Check the instant's weathers array's count and if it is 40, then
-        the document is returned.
+        True is returned, otherwise it returns False.
 
         :param instant: the instant docuemnt to be legitimized
         :type instant: dictionary
+        :return: Boolian value (True or False)
         '''
         
         self.count()
@@ -76,7 +84,7 @@ def cast_count_all(instants):
 def sweep(instants):
     ''' Move any instant that has a ref_time less than the current next
     ref_time and with self.count less than 40. This is getting rid of the
-    instnats that are not and will never be legit. 
+    instants that are not and will not ever be legit.
 
     :param instants: a itterable of Instant objects
     :type instants: dict, list, pymongo cursor
@@ -85,12 +93,13 @@ def sweep(instants):
     import time
     
     import pymongo
+    from pymongo import MongoClient
     from pymongo.cursor import Cursor
-    from Extract.make_instants import find_data
-    from config import client, database
-    from db_ops import dbncol
+    import config
+    import db_ops
     
-    col = dbncol(client, 'instant_temp', database=database)
+    client = MongoClient('localhost', 27017)
+    col = db_ops.dbncol(client, 'instant_temp', config.database)
     n = 0
     # Check the instant type- it could be a dict if it came from the database,
     # or it could be a list if it's a bunch of instant objects, or a pymongo
@@ -130,37 +139,38 @@ def find_legit(instants):
     ### methods you've been writing.
 
 
-def load_legit(legit_list):
+def load_legit(legit):
     ''' Load the 'legit' instants to the remote database and delete from temp.
-    This process does not delete the 
+    This process does not delete the documents upon insertion, but rather holds
+    it until the next time, tries to load it then, and finally, when getting a duplicate
+    key error, deletes the document from its temporary location.
 
-    :param collection: the collection you want to pull instants from
-    :type collection: pymongo.collection.Collection
+    :param legit: a single document
+    :type legit: dict
     '''
 
+    from pymongo import MongoClient
     from pymongo.errors import DuplicateKeyError
 
     import config
-    from config import remote_client
-    from config import client
-    from config import database
-    from db_ops import dbncol
+    import db_ops
     
-### this should load to the remote_client.owmap.legit_inst for production ###
-    remote_col = dbncol(remote_client, 'legit_inst', database=database)
-    col = dbncol(client, 'instant_temp', database=database)
-    # col = dbncol(client, 'legit_inst', database=database)
+    client = MongoClient('localhost', 27017)
+    remote_col = db_ops.dbncol(db_ops.Client(config.uri),'legit_inst', config.database)
+    col = db_ops.dbncol(client, 'instant_temp', config.database)
+    # col = dbncol(client, 'legit_inst', config.database)
     try:
-        check = remote_col.insert_one(legit_list)
+        check = remote_col.insert_one(legit)
         if not check:
             print('was not able to insert to remote db')
     except DuplicateKeyError:
-        col.delete_one(legit_list)
-        ### saved for later, when doing it on bulk ###
+        col.delete_one(legit)
+#     ### saved for later, when doing it on bulk ###
 #     col.insert_many(legit_list)
-    # Now go to the temp_instants collection and delete the instants just
-    # loaded to legit_inst.
+#     # Now go to the temp_instants collection and delete the instants just
+#     # loaded to legit_inst.
 #     col.delete_many(legit_list)
+#     ### saved for later, when doing it on bulk ###
     return
 
 
@@ -176,7 +186,9 @@ if __name__ == '__main__':
     import db_ops
 
     collection = 'instant_temp'
-    col = db_ops.dbncol(config.client, collection, database=config.database)
+    col = db_ops.dbncol(db_ops.Client(config.uri),
+                        collection,
+                        config.database)
     cast_count_all(col.find({}))
     sweep(col.find({}))
-    print(f'Total op time for instant.py was {time.time()-start_time} seconds')
+    print(f'Execution time for instant.py was {time.time()-start_time} seconds')
