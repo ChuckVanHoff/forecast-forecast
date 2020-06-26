@@ -175,8 +175,7 @@ def load_legit(legit):
 
 
 import time
-start_time = time.time() # This is to get the total runtime if this script is
-                         # run as __main__
+
 if __name__ == '__main__':
     ''' Connect to the database, then move all the legit instants to the remote
     database and clear out any instants that are past and not legit.
@@ -185,10 +184,13 @@ if __name__ == '__main__':
     import config
     import db_ops
 
+    start_time = time.time() # This is to get the total runtime if this script is
+                             # run as __main__
+    print('Database sweep in progress...')
     collection = 'instant_temp'
     col = db_ops.dbncol(db_ops.Client(config.uri),
                         collection,
                         config.database)
     cast_count_all(col.find({}))
     sweep(col.find({}))
-    print(f'Execution time for instant.py was {time.time()-start_time} seconds')
+    print(f'Total sweep time was {time.time()-start_time} seconds')
