@@ -11,6 +11,7 @@ pandas = "*"
 python-benedict = "*"
 jupyterlab = "*"
 dnspython = "*"
+pymongo = "*"
 
 [requires]
 python_version = "3.7"
