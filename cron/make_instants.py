@@ -163,19 +163,15 @@ def update_command_for(data):
     
     # Logic for the weather.Weather class days
     if data['_type'] == 'forecast':
-#         print('type is forecast')
         filters = {'_id': data['_id']}
         updates = {'$push': {'forecasts': data}} # append to forecasts list
-#         print(UpdateOne(filters, updates,  upsert=True))
         return UpdateOne(filters, updates,  upsert=True)
-    elif data['_type'] == 'weather':
-#         print('type is weather')
+    elif data['_type'] == 'observation':
         filters = {'_id': data['_id']}
         updates = {'$set': {'observations': data}}
-#         print(UpdateOne(filters, updates,  upsert=True))
         return UpdateOne(filters, updates,  upsert=True)
-# 
     # Logic for the pre-weather.Weather class days
+
     elif "Weather" in data:
         try:
             filters = {'zipcode': data['Weather'].pop('zipcode'),
@@ -201,8 +197,6 @@ def update_command_for(data):
                 except KeyError:
                     print('caught keyerror')
     else:
-#         filters = {'zipcode': data.pop('zipcode'), 'instant': data.pop('instant')}
-#         updates = {'$push': {'forecasts': data}} # append to forecasts list
         try:
             filters = {'zipcode': data.pop('zipcode'), 'instant': data.pop('instant')}
             updates = {'$push': {'forecasts': data}} # append to forecasts list
@@ -214,7 +208,6 @@ def update_command_for(data):
                 # Print the error and try to make an update command for it to
                 # be added to the updates list.
                 print(e)
-#                 return UpdateOne({'errs': 'None'}, {'$set': {'errors': data}}, upsert=True)
 
 def delete_command_for(data):
     ''' the 'delete command' is the MongoDB command that is used to update data
@@ -268,11 +261,17 @@ def make_load_list_from_cursor(pymongoCursorOnWeather):
     update_list = []
     
     ### Logic for the weather.Weather class days ###
-    for obj in pymongoCursorOnWeather:
-        update_list.append(update_command_for(obj))
-    return update_list
-
-    ### Logic for the pre-weather.Weather class  days ###
+    try:
+        n=0
+        for obj in pymongoCursorOnWeather:
+            update_list.append(update_command_for(obj))
+        return update_list
+    except:
+        print('Error making load_list')
+        exit()
+    ### Logic for the weather.Weather class days ###
+        
+    ### Logic for the pre-weather.Weather class  days ###    
     # check the first entry to know whether it's forecast or observation
     if 'Weather' in pymongoCursorOnWeather[0]:
         for obj in pymongoCursorOnWeather:
@@ -284,13 +283,9 @@ def make_load_list_from_cursor(pymongoCursorOnWeather):
             # Trying things that will capture any of the formats published over
             # the developemnet period.
             try:
-                ### This try is part of the logic from a time before the use of
-                ### the Weather class. The except is where the logic for the 
-                ### Weather class is written
                 if 'reception_time':
                     update_list.append(update_command_for(cast))
                     print('found reception_time')
-#                     print(obj)
                     casts = obj['weathers'] # use the 'weathers' array from the
                                             # forecast
                     for cast in casts:
@@ -298,6 +293,7 @@ def make_load_list_from_cursor(pymongoCursorOnWeather):
                         cast['time_to_instant'] = cast['instant']\
                                                 - obj['reception_time']
                         update_list.append(update_command_for(cast))
+                    return update_list
                 else:
                     casts = obj['weathers'] # use the 'weathers' array from the
                                             # forecast
@@ -308,23 +304,11 @@ def make_load_list_from_cursor(pymongoCursorOnWeather):
                         cast['time_to_instant'] = cast['instant']\
                                                 - cast['reception_time']
                         update_list.append(update_command_for(cast))
+                    return update_list
             except KeyError as e:
                 print(f'from make_instants.make_load_list_from_cursor(): KeyError.args = {e.args}')
-                return e.with_traceback
-                filename = 'keyerror_from_id_not_updated.txt'
-                print(f'printing to {filename}')
-                with open(filename, 'a') as f:
-                    f.write(str(obj['_id'])+'\n')
-                # print(f'KeyError....{obj["_id"]}')
-            except:
-                pass
-#                 filename = 'some_other_error_from_id_not_updated.txt'
-#                 print(f'printing to {filename}')
-#                 with open(filename, 'a') as f:
-#                     f.write(obj['_id']+'\n')
-#         print(update_list)
-#         print(type(update_list))
-    return update_list
+                print(e.with_traceback)
+                return
 
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     ''' move or copy a collection within and between databases 
@@ -345,34 +329,47 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     copy = []
     for item in col.find(filters):
         copy.append(item)
-    destination = db_ops.dbncol(client, destination_col, destination_db)
-    inserted_ids = destination.insert_many(copy).inserted_ids
-    if delete == True:
-        # remove all the documents from the original collection
-        for row in inserted_ids:
-            filters = {'_id': row}
-            col.delete_one(filters)
+    destination = db_ops.dbncol(client, destination_col, destination_db)    
+    try:
+        inserted_ids = destination.insert_many(copy).inserted_ids
+        if delete == True:
+            # remove all the documents from the original collection
+            for row in inserted_ids:
+                filters = {'_id': row}
+                col.delete_one(filters)
+    except pymongo.errors.BulkWriteError as e:
+        print(f'The documents have not been copied to {destination_col}.')
+        print(e)
+    return
 
 def make_instants(client):
     ''' Make the instant documents, as many as you can, with the data in the
-    named database. '''
-
+    named database. 
+    
+    - Process: Connect to the database, get the data from the database, make a
+    list lf load commands to get each document sorted into its proper instant
+    document, and finally move the sorted documents to their archives.
+    
+    :param client: a MongoDB client
+    :type client: pymongo.MongoClient
+    '''
+    
+    #Get the data
     cast_col = db_ops.dbncol(client, "cast_temp", config.database)
     obs_col = db_ops.dbncol(client, "obs_temp", config.database)
     inst_col = db_ops.dbncol(client, "instant_temp", config.database)
     forecasts = cast_col.find({})
     observations = obs_col.find({})
-    inst_col.create_index([('instant', pymongo.DESCENDING)])
-
-    ### see what's going on with the make_cursor funciton ###
-#     inst_col.bulk_write(make_load_list_from_cursor(forecasts))
+    
+    inst_col.create_index([('timeplace', pymongo.DESCENDING)])
+    
+    # make the load lists and load the data
     cast_load_list = make_load_list_from_cursor(forecasts)
     obs_load_list = make_load_list_from_cursor(observations)
-    print(f'length of load_lists: cast={len(cast_load_list)},\
-    obs={len(obs_load_list)}')
     inst_col.bulk_write(cast_load_list)
     inst_col.bulk_write(obs_load_list)
-    ### see what's going on with the make_cursor funciton ###
     
-#     copy_docs(cast_col, config.database, 'cast_archive', delete=True)
-#     copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+    # Copy the docs to archive storage and delete the source data.
+    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
+    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+    return

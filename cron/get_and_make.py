@@ -33,27 +33,35 @@ def get_and_make(codes):
     for code in codes:
         try:
             current = weather.get_current_weather(code)
-        except AttributeError:
+#             print(current)
+#             exit()
+            ### If the data was not recieved a -1 should have been returned.
+            ### When this happens it should be handled some way other than
+            ### just skipping over it. And the try block is not necessary here.
+        except AttributeError as e:
+            print(e)
             print(f'AttributeError for {code}. Continuing to next code.')
+#             exit()
             continue
         n+=1
         coords = current.loc ###['coordinates']
         try:
             forecasts = weather.five_day(coords)
         except AttributeError:
-            print(f'got AttributeError for {code}. Continuing to next code.')
+            print(f'got AttributeError for {coords}. Continuing to next code.')
             continue
         n+=1
         
         ### This should load to database the old way if the data comes in as
         ### the old way (that is, as strait up dict or list) but switch to the
         ### new way if the data was collected and returned as Weather objects.
-        db_ops.load(current.as_dict, client, config.database, 'obs_temp')
-        for cast in forecasts:
-            db_ops.load(cast.as_dict, client, config.database, 'cast_temp')
-        
-#         request_and_load.load_weather(current, client, 'owmap', 'obs_temp')
-#         request_and_load.load_weather(forecasts, client, 'owmap', 'cast_temp')
+        try:
+            db_ops.load(current.as_dict, client, config.database, 'obs_temp')
+            for cast in forecasts:
+                db_ops.load(cast.as_dict, client, config.database, 'cast_temp')
+        except:
+            request_and_load.load_weather(current, client, config.database, 'obs_temp')
+            request_and_load.load_weather(forecasts, client, config.database, 'cast_temp')
 
         # if the api request rate is greater than 60 just keep going. Otherwise
         # check how many requests have been made and if it's more than 120
@@ -91,4 +99,5 @@ if __name__ == '__main__':
         codes = read_list_from_file(filename)
     client = MongoClient(host=host, port=port)
     get_and_make(codes)
+#     get_and_make(codes[:61])
     client.close()

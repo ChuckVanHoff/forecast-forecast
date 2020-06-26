@@ -32,12 +32,12 @@ class Weather:
 #         self.type = _type
 #         self.loc = location
 #         self.weather = data
-#         # make the _id for each weather according to its reference time
+#         # make the timeplace for each weather according to its reference time
 #         if _type == 'forecast' and 'reference_time' in data:
-#             self._id = f'{str(location)}{str(data["reference_time"])}'
+#             self.timeplace = f'{str(location)}{str(data["reference_time"])}'
 #         elif _type == 'observation': #and 'Weather' in data:
-#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
-#         self.as_dict = {'_id': self._id,
+#             self.timeplace = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
+#         self.as_dict = {'timeplace': self.timeplace,
 #                        '_type': self.type,
 #                         'weather': self.weather
 #                        }
@@ -54,7 +54,7 @@ class Weather:
 
         # Create a default weather dict and update it with data.
         weather = {
-            '_id': 'DEFAULT',
+            'timeplace': 'DEFAULT',
             'clouds': 'DEFAULT',
             'rain': {'1h': 0,
                     '3h': 0
@@ -83,25 +83,22 @@ class Weather:
             'heat_index': 'DEFAULT',
             'time_to_instant': 'DEFAULT'
         }
-        ### Added new update function ###
-#         weather = overalls.update_nested(weather, data)
         weather = benedict(weather)
         weather.merge(data)
         
         self.type = _type
         self.loc = location
-        # Define the weather data structure
-        self.weather = weather#.update(data)
-        # make the _id for each weather according to its reference time
-        if _type == 'forecast' and 'reference_time' in data:
-            self._id = f'{str(location)}{str(data["reference_time"])}'
-        elif _type == 'observation' and 'Weather' in data:
-            self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}' #["Weather"]["reference_time"]//10800 + 1))}'
+        self.weather = weather
+        # make the timeplace for each weather according to its type
+        if _type == 'forecast':# and 'reference_time' in data:
+            self.timeplace = f'{str(location)}{str(data["reference_time"])}'
+        elif _type == 'observation':# and 'Weather' in data:
+            self.timeplace = f'{str(data["location"])}{str(10800 * (data["reference_time"]//10800 + 1))}'
         else:
-            self._id = weather['_id']    
-        self.as_dict = {'_id': self._id,
-                       '_type': self.type,
-                        'weather': self.weather
+            self.timeplace = weather['timeplace']
+        self.as_dict = {'timeplace': self.timeplace, \
+                        '_type': self.type, \
+                        'weather': self.weather \
                        }
 
     def to_inst(self, instants):
@@ -118,13 +115,13 @@ class Weather:
             instants = {'init': 'true'}
         if self.type == 'observation':
 #             print('setting something as observation')
-            instants.setdefault(self._id, Instant(self._id, observations=self.weather))
+            instants.setdefault(self.timeplace, Instant(self.timeplace, observations=self.weather))
             return
         if self.type == 'forecast':
 #             print('setting something as forecast')
-            instants.setdefault(self._id, Instant(self._id)).casts.append(self.weather)
-#             instants.setdefault(self._id, Instant(self._id))['forecasts'].append(self.weather)
-#             instants[self._id]['forecasts'].append(weather)
+            instants.setdefault(self.timeplace, Instant(self.timeplace)).casts.append(self.weather)
+#             instants.setdefault(self.timeplace, Instant(self.timeplace))['forecasts'].append(self.weather)
+#             instants[self.timeplace]['forecasts'].append(weather)
             return
 
 
@@ -148,6 +145,8 @@ def get_data_from_weather_api(owm, location, current=False):
     tries = 1
     while result is None and tries < 4:
         try:
+            # Choose the weather type that should be returned by the function:
+            # current or forecast?
             if type(location) == dict:
                 if current:
                     result = owm.weather_at_coords(**location)
@@ -157,27 +156,31 @@ def get_data_from_weather_api(owm, location, current=False):
                     return result
             elif type(location) == str:
                 result = owm.weather_at_zip_code(location, 'us')
+#                 print(json.loads(result.to_JSON()))
+#                 exit()
                 return result
         except APIInvalidSSLCertificateError as e:
-            print(str(e))
+#             print('Error from get_data_from_weather_api() in weather.py', e)
             if type(location) == dict:
-                loc = 'lat: {}, lon: {}'.format(location['lat'], location['lon'])
+                loc = 'lat: {}, lon: {}'.format(location['lat'], \
+                                                location['lon'])
                 owm_loohoo = OWM(loohoo_key)
                 owm = owm_loohoo
             elif type(location) == str:
                 loc = location
                 owm_masta = OWM(masta_key)
                 owm = owm_masta
-            print(f'SSL error with {loc} on attempt {tries} ...trying again')
+            print(f'''SSL error in get_data_from_weather_api() for {loc} on
+                  attempt {tries} ...trying again''')
         except APICallTimeoutError:
-            loc = location or 'lat: {}, lon: {}'.format(location['lat'],
-                                                           location['lon'])
-            print(f'''Timeout error with {loc} on attempt {tries}... waiting /
-            1 second then trying again''')
+            loc = location or 'lat: {}, lon: {}'.format(location['lat'], \
+                                                        location['lon'])
+            print(f'''Timeout error in get_data_from_weather_api() for {loc} on
+            attempt {tries}... I'll wait 1 second then try again.''')
             time.sleep(1)
         tries += 1
     if tries == 4:
-        print('''tried 3 times without response; moving to the next location.''')
+        print('''Tried 3 times without response; moving to next location.''')
         return -1  ### sometime write something to keep track of the zip and
                 ### instant that isn't collected ###
 
@@ -196,19 +199,29 @@ def get_current_weather(location):
     m = 0
     # Try several times to get complete the API request
     while m < 4:
+        # Get the raw data from the OWM and make a weather.Weather from it.
         try:
-            # get the raw data from the OWM and make a Weather from it
+            # The data type of the location argument will determine how to ask
+            # the API for the data.
             if type(location) == dict:
-                result = get_data_from_weather_api(owm, location, coords=location)
-            result = get_data_from_weather_api(owm, location)
+                result = get_data_from_weather_api(owm, location, current=True)
+            else:
+                result = get_data_from_weather_api(owm, location)
+            # Return a flag to indicate the result was not recieved.
             if result == -1:
-                print(f'Did not get current weather for {location} and reset owm')
+                print(f'''Did not get current weather for {location}
+                and reset owm.''')
                 return result
-            result = json.loads(result.to_JSON())  # the current weather for the given zipcode
-            coordinates = result['Location'].pop('coordinates')
+            # Transform the data before returning it.
+            result = json.loads(result.to_JSON())
+            coordinates = result['Location']['coordinates']
+            timeplace = str(coordinates) \
+                + str(10800 * (result['Weather']['reference_time']//10800 + 1))
             result['Weather']['location'] = coordinates
-            result.pop('reception_time')
-            result.pop('Location')
+            result['Weather']['timeplace'] = timeplace
+            result['time_to_instant'] = result['Weather']['reference_time'] \
+                                    - result['reception_time']            
+#             weather = Weather(location, 'observation', result['Weather'])
             weather = Weather(coordinates, 'observation', result['Weather'])
             return weather
         except APICallTimeoutError:
@@ -232,20 +245,10 @@ def five_day(location):
     forecast = json.loads(Forecast.to_JSON())
     casts = [] # This is for the weather objects created in the for loop below.
     for data in forecast['weathers']:
-        # Make an _id for the next Weather to be created, create the weather, 
+        # Make an timeplace for the next Weather to be created, create the Weather,
         # append it to the casts list.
-        instant = data['reference_time']
+        data['timeplace'] = str(location) + str(data['reference_time'])
+        data['time_to_instant'] = data['reference_time'] \
+                                - forecast['reception_time']
         casts.append(Weather(location, 'forecast', data))
     return casts
-
-
-# from Extract.make_instants import find_data
-# # set database and collection for testing
-# database = 'test'
-# collection = 'instant_temp'
-# # create a dict to hold the instants pulled from the database
-# instants = {}
-# data = find_data(client, database, collection)
-# # add each doc to instants and set its key and _id to the same values
-# for item in data:
-#     instants[f'{item["_id"]}'] = item['_id']
