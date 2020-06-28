@@ -40,6 +40,22 @@ def all_keys(d):
             keys.append(str(key))
     return keys
 
+def strip_keys(dict_list):
+    ''' Take a list of dictionaries and return a  list of lists of those
+    dictionary values. 
+    
+    :param e: a list of dicts
+    :type e: At least in forecast-forecast the input type will be a pandas
+    Series, but in general it can take any list-like object of dictionaries.
+    :return: a list of lists of dict values w/o keys
+    '''
+    
+    values = []
+    for d in dict_list:
+        values.append([list(flatten_dict(dic).values()) for dic in d])
+    return values
+
+
 ### THIS DOES NOT WORK ###
 # def all_values(d, values=[]):
 #     ''' Get all the dicitonary and nested dictionary keys from a dict, add them
