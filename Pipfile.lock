@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "8f059d60b3b46b560af49b93c5cd81d7107204a46bf04aab202bda0363261243"
+            "sha256": "5835029da9163e1b8e2fa84d3fe66251e9fc55e26429649a51e7d274a6e1d88c"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -110,11 +110,11 @@
         },
         "importlib-metadata": {
             "hashes": [
-                "sha256:0505dd08068cfec00f53a74a0ad927676d7757da81b7436a6eefe4c7cf75c545",
-                "sha256:15ec6c0fd909e893e3a08b3a7c76ecb149122fb14b7efe1199ddd4c7c57ea958"
+                "sha256:90bb658cdbbf6d1735b6341ce708fc7024a3e14e99ffdc5783edea9f9b077f83",
+                "sha256:dc15b2969b4ce36305c51eebe62d418ac7791e9a157911d58bfb1f9ccd8e2070"
             ],
             "markers": "python_version < '3.8'",
-            "version": "==1.6.1"
+            "version": "==1.7.0"
         },
         "ipykernel": {
             "hashes": [
@@ -125,10 +125,10 @@
         },
         "ipython": {
             "hashes": [
-                "sha256:0ef1433879816a960cd3ae1ae1dc82c64732ca75cec8dab5a4e29783fb571d0e",
-                "sha256:1b85d65632211bf5d3e6f1406f3393c8c429a47d7b947b9a87812aa5bce6595c"
+                "sha256:2dbcc8c27ca7d3cfe4fcdff7f45b27f9a8d3edfa70ff8024a71c7a8eb5f09d64",
+                "sha256:9f4fcb31d3b2c533333893b9172264e4821c1ac91839500f31bd43f2c59b3ccf"
             ],
-            "version": "==7.15.0"
+            "version": "==7.16.1"
         },
         "ipython-genutils": {
             "hashes": [
@@ -453,7 +453,7 @@
             "hashes": [
                 "sha256:2ac88777565518b9e9aa3fc172c543ada4cbfc667d83775cd17c0e52ea6ccc86",
                 "sha256:8fd41a18536f4d6c432bc6d9ea69994efb1ea9b43688cf19523659b6f4d86cf7",
-                "sha256:eebc1584a019ebb6f1f510ad5a5f18cb5a06f69457b5a0b894d1c6b793b1eacc"
+                "sha256:f9fbd40cdc6c3e5f8a88309e19d82943f0a0322edd552c1ee37fc1341a643f55"
             ],
             "path": "../pyowm/dist/pyowm-2.10.0-py3-none-any.whl",
             "version": "==2.10.0"
@@ -485,6 +485,13 @@
                 "sha256:75bb3f31ea686f1197762692a9ee6a7550b59fc6ca3a1f4b5d7e32fb98e2da2a"
             ],
             "version": "==2.8.1"
+        },
+        "python-geohash": {
+            "hashes": [
+                "sha256:05a21fcf4eda1a5eddbd291890ade23fc5ddaa6bb98f2ee23d2d384ed14f086d"
+            ],
+            "index": "pypi",
+            "version": "==0.8.5"
         },
         "python-slugify": {
             "hashes": [

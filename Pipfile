@@ -12,6 +12,7 @@ python-benedict = "*"
 jupyterlab = "*"
 dnspython = "*"
 pymongo = "*"
+python-geohash = "*"
 
 [requires]
 python_version = "3.7"

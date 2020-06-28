@@ -8,6 +8,7 @@ import time
 import json
 
 from pymongo import MongoClient
+import geohash
 
 import request_and_load
 import weather
@@ -16,7 +17,6 @@ import make_instants
 import config
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
-from config import port, host #, user, password, socket_path
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -95,12 +95,24 @@ def get_and_make(codes):
     It took {time.time() - start_start} seconds and processed {i} locations''')
 
 if __name__ == '__main__':
-    # This try block is to deal with the switching back and forth between
-    # computers with different directory names.
-    directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
-    filename = os.path.join(directory, 'ETL', 'resources', 'success_zipsNC.csv')
-    codes = read_list_from_file(filename)
-    client = MongoClient(host=host, port=port)
-    get_and_make(codes)
-#     get_and_make(codes[:61])
+    ### Commented after update to get current by geocoord was made. ###
+#     directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
+#     filename = os.path.join(directory, 'ETL', 'resources', 'success_zipsNC.csv')
+#     codes = read_list_from_file(filename)
+
+    client = MongoClient(config.host, config.port)
+    
+    # Create a geohash list and convert it to a list of coordinate locations
+    # from a geohash list.
+    b32 = '0123456789bcdefghjkmnpqrstuvwxyz'
+    hl = [f'dn{p3}{p4}{p5}' for p3 in b32[16:24] for p4 in b32 for p5 in b32]
+    locations = []  # Coordinate list
+    for row in hl:
+        cd = {}  # Coordinate dict
+        cd['lon'] = geohash.decode(row)[0]
+        cd['lat'] = geohash.decode(row)[1]
+        locations.append(cd)
+
+    get_and_make(locations)
+#     get_and_make(codes)
     client.close()
