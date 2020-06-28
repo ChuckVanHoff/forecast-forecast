@@ -138,19 +138,19 @@ def get_data_from_weather_api(owm, location, current=False):
         except APIInvalidSSLCertificateError as e:
 #             print('Error from get_data_from_weather_api() in weather.py', e)
             if type(location) == dict:
-                loc = 'lat: {}, lon: {}'.format(location['lat'], \
-                                                location['lon'])
+#                 loc = 'lat: {}, lon: {}'.format(location['lat'], \
+#                                                 location['lon'])
                 owm_loohoo = OWM(loohoo_key)
                 owm = owm_loohoo
             elif type(location) == str:
-                loc = location
+#                 loc = location
                 owm_masta = OWM(masta_key)
                 owm = owm_masta
 #             print(f'''SSL error in get_data_from_weather_api() for {loc} on
 #                   attempt {tries} ...trying again''')
         except APICallTimeoutError:
-            loc = location or 'lat: {}, lon: {}'.format(location['lat'], \
-                                                        location['lon'])
+#             loc = location or 'lat: {}, lon: {}'.format(location['lat'], \
+#                                                         location['lon'])
 #             print(f'''Timeout error in get_data_from_weather_api() for {loc} on
 #             attempt {tries}... I'll wait 1 second then try again.''')
             time.sleep(1)
