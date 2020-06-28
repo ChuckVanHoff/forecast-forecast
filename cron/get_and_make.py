@@ -98,7 +98,7 @@ if __name__ == '__main__':
     # This try block is to deal with the switching back and forth between
     # computers with different directory names.
     directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
-    filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
+    filename = os.path.join(directory, 'ETL', 'resources', 'success_zipsNC.csv')
     codes = read_list_from_file(filename)
     client = MongoClient(host=host, port=port)
     get_and_make(codes)
