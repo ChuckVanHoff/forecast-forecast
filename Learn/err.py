@@ -16,14 +16,9 @@ def read_mongo_to_df(uri, db, collection, query={}, limit=None):
     db = con[db]
     col = db[collection]
     # Make a query to the specific DB and Collection
-    if limit:
-        cursor = col.find(query)
-        cursor = cursor[limit]
-        print(f'number of indexes created has been limited to {limit} .......')
-    else:
-        cursor = con[collection].find(query)
+    cursor = col.find(query)[:limit]
     # Expand the cursor and construct the DataFrame
-    df = pd.DataFrame.from_dict(cursor, orient='index')
+    df = pd.DataFrame.from_dict(list(cursor), orient='index')
     return df.transpose()
 
 def fill_missing(row):

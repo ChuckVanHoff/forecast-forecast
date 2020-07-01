@@ -77,7 +77,7 @@ def Client(uri):
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
+def dbncol(client, collection, database):
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -103,6 +103,17 @@ def dbncol(client, collection, database): ###=database): I don't think this is n
         db = Database(client, database)
         print('did it without issue.')
     col = Collection(db, collection)
+    return col
+
+def read_to_dict(collection):
+    ''' Read the colleciton to a dictionary.
+    
+    :param collection: MongoDB collection
+    :type collection: pymongo.collection.Collection
+    '''
+    col = {}
+    for doc in collection:
+        col['_id'] = doc
     return col
 
 def load(data, client, database, collection):

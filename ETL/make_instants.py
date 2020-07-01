@@ -54,17 +54,19 @@ def update_command_for(data):
     :return: the command that will be used to find and update documents
     ''' 
     
-    
     if data['_type'] == 'forecast':
-        filters = {'_id': data['_id']}
+        filters = {'timeplace': data['timeplace']}
         updates = {'$push': {'forecasts': data}} # append to forecasts list
         return pymongo.UpdateOne(filters, updates,  upsert=True)
     elif data['_type'] == 'observation':
-        filters = {'_id': data['_id']}
+        filters = {'timeplace': data['timeplace']}
         updates = {'$set': {'observations': data}}
         return pymongo.UpdateOne(filters, updates,  upsert=True)
     else:
-        print('There was neither "forecast" nor "observations" as "_type".')
+        filters = {'timeplace': data['timeplace']}
+        updates = {'$set': data}
+        print('made load command for an instant')
+        return pymongo.UpdateOne(filters, updates,  upsert=True)
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
