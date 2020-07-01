@@ -3,7 +3,7 @@
 import time
 import json
 
-from benedict import benedict
+import benedict
 from pyowm import OWM
 from pyowm.weatherapi25.forecast import Forecast
 from pyowm.exceptions.api_response_error import NotFoundError
@@ -20,30 +20,6 @@ class Weather:
     for a given instant in time at a specified location.
     '''
     
-### commented original so I could work on alterations ###
-#     def __init__(self, location, _type, data=None):
-#         '''
-#         :param location: can be either valid US zipcode or coordinate dictionary
-#         :type location: If this param is a zipcode, it should be str, otherwise
-#         dict
-#         :param _type: Indicates whether its data is observational or forecasted
-#         :type _type: string  It must be either 'observation' or 'forecast'
-#         '''
-
-#         self.type = _type
-#         self.loc = location
-#         self.weather = data
-#         # make the _id for each weather according to its reference time
-#         if _type == 'forecast' and 'reference_time' in data:
-#             self._id = f'{str(location)}{str(data["reference_time"])}'
-#         elif _type == 'observation': #and 'Weather' in data:
-#             self._id = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
-#         self.as_dict = {'_id': self._id,
-#                        '_type': self.type,
-#                         'weather': self.weather
-#                        }
-    
-    ### COPY adding deafult weather object ###
     def __init__(self, location, _type, data={}):
         '''
         :param location: can be either valid US zipcode or coordinate dictionary
@@ -84,10 +60,11 @@ class Weather:
             'heat_index': 'DEFAULT',
             'time_to_instant': 'DEFAULT'
         }
-        ### Added new update function ###
-#         weather = overalls.update_nested(weather, data)
-        weather = benedict(weather)
-        weather.merge(data)
+        weather = benedict.benedict(weather)
+        data = benedict.benedict(data)
+        w = weather.flatten()
+        d = data.flatten()
+        weather = w.merge(d)
         
         self.type = _type
         self.loc = location
