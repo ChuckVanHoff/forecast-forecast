@@ -15,6 +15,7 @@ This is intended to create a model to predict the errors in the weather predicti
 You will also need write access to a MongoDB database. With the database setup, it's best
 to set the database name from the config.py file, which you must add yourself.
 Here is an example:
+
 from urllib.parse import quote
 OWM_API_key_1 = '[your api key]'
 OWM_API_key_2 = '<your other api key>'
