@@ -195,8 +195,17 @@ def get_current_weather(location):
             # Transform the data before returning it.
             result = json.loads(result.to_JSON())
             coordinates = result['Location']['coordinates']
-            timeplace = str(coordinates) \
-                + str(10800 * (result['Weather']['reference_time']//10800 + 1))
+            
+            # Set the reference_time to the nearest instant.
+            ref_time = min(
+                abs(10800 * (result['Weather']['reference_time']//10800 + 1)
+                    - result['Weather']['reference_time']
+                   ),
+                abs(10800 * (result['Weather']['reference_time']//10800)
+                    - result['Weather']['reference_time']
+                   )
+
+            timeplace = str(coordinates) + str(ref_time))
             result['Weather']['location'] = coordinates
             result['Weather']['timeplace'] = timeplace
             result['time_to_instant'] = result['Weather']['reference_time'] \
