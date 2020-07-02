@@ -61,10 +61,10 @@ def update_command_for(data):
         return pymongo.UpdateOne(filters, updates,  upsert=True)
     elif data['_type'] == 'observation':
         filters = {'_id': data['_id']}
-        updates = {'$set': {'observations': data}}
+        updates = {'$set': {'observation': data}}
         return pymongo.UpdateOne(filters, updates,  upsert=True)
     else:
-        print('There was neither "forecast" nor "observations" as "_type".')
+        print('There was neither "forecast" nor "observation" as "_type".')
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -119,7 +119,7 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
         print(e)
     return
 
-def make_instants(client):
+def make_instants(client, cast_col, obs_col, inst_col):
     ''' Make the instant documents, as many as you can, with the data in the
     named database. 
     
@@ -132,9 +132,9 @@ def make_instants(client):
     '''
     
     #Get the data
-    cast_col = db_ops.dbncol(client, "cast_temp", config.database)
-    obs_col = db_ops.dbncol(client, "obs_temp", config.database)
-    inst_col = db_ops.dbncol(client, "instant_temp", config.database)
+    cast_col = db_ops.dbncol(client, cast_col, config.database)
+    obs_col = db_ops.dbncol(client, obs_col, config.database)
+    inst_col = db_ops.dbncol(client, inst_col, config.database)
     forecasts = cast_col.find({})
     observations = obs_col.find({})
     
@@ -143,10 +143,14 @@ def make_instants(client):
     # make the load lists and load the data
     cast_load_list = make_load_list_from_cursor(forecasts)
     obs_load_list = make_load_list_from_cursor(observations)
-    inst_col.bulk_write(cast_load_list)
-    inst_col.bulk_write(obs_load_list)
+    cast_instered = inst_col.bulk_write(cast_load_list).upserted_ids
+    obs_inserted = inst_col.bulk_write(obs_load_list).upserted_ids
     
     # Copy the docs to archive storage and delete the source data.
-    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
-    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+#    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
+#    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+    # Delete the used documents. The data is all contained in the insants, so
+    # there's no reason to keep it around taking up space.
+    cast_col.delete_many(cast_inserted)
+    obs_col.delete_many(obs_inserted)
     return
