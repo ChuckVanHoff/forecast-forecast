@@ -204,8 +204,9 @@ def get_current_weather(location):
                 abs(10800 * (result['Weather']['reference_time']//10800)
                     - result['Weather']['reference_time']
                    )
+            )
 
-            timeplace = str(coordinates) + str(ref_time))
+            timeplace = str(coordinates) + str(ref_time)
             result['Weather']['location'] = coordinates
             result['Weather']['timeplace'] = timeplace
             result['time_to_instant'] = result['Weather']['reference_time'] \
