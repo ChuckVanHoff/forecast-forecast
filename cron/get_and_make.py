@@ -79,7 +79,12 @@ def get_and_make(codes):
         else:
             i+=1
             if n>=120:
-                make_instants.make_instants(client)
+                make_instants.make_instants(
+                    client,
+                    config.forecast_collection, 
+                    config.observation_collection,
+                    config.instants_collection
+                )
                 if time.time() - start_time < 60:
                     print(f'Waiting {start_time+60 - time.time()} seconds before resuming API calls.')
                     time.sleep(start_time - time.time() + 60)
