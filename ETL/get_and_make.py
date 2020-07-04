@@ -41,7 +41,7 @@ def get_and_make(codes):
 
     # Begin a timer for the process and run the request and load process.
     start_start = time.time()
-    print(f'Weather ETL process began at {time.ctim()}.')
+    print(f'Weather ETL process began at {time.ctime()}.')
     i, n = 0, 0 # i for counting zipcodes processed and n for counting API
                 # calls made; API calls limited to a maximum 60/minute/apikey.
     start_time = time.time()
