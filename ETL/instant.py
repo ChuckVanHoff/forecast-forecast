@@ -228,7 +228,7 @@ if __name__ == '__main__':
     col = db_ops.dbncol(db_ops.Client(config.uri),
                         collection,
                         config.database)
-    instants = db_ops.read_to_dict(col.find({}))
+    instants = db_ops.read_mongo_to_dict(col)
     find_legit(instants, and_load=True)
 #     col.bulk_write(load_list)
     sweep(col.find({}))

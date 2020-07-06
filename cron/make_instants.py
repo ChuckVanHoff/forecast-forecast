@@ -18,7 +18,10 @@ import config
 # use the local host and port for all the primary operations
 port = config.port #27017
 host = config.host #'localhost'
-client = MongoClient(host=host, port=port)
+
+### There should be an open client already available
+# client = MongoClient(host=host, port=port)
+### There should be an open client already available
 
 def find_data(client, database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
@@ -161,4 +164,10 @@ def make_instants(client, cast_col, obs_col, inst_col):
         obs_update_list.append(pymongo.operations.DeleteOne(o_id))
     cast_col.bulk_write(cast_update_list)
     cast_col.bulk_write(obs_update_list)
+
+    ### Closing the client ###
+    # print(f'closing the client ....... {client}')
+    # client.close()
+    ### Closing the client ###
+
     return
