@@ -119,6 +119,6 @@ if __name__ == '__main__':
         cd['lat'] = geohash.decode(row)[1]
         locations.append(cd)
 
-    limit = 2
+    limit = None
     print(f'The number of locations is limited to {limit}.')
     get_and_make(locations[:limit])
