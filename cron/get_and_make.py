@@ -17,6 +17,7 @@ import make_instants
 import config
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
+from config import port, host #, user, password, socket_path
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -34,13 +35,13 @@ def get_and_make(codes):
     ''' Request weather data from the OWM api. Transform and load that data
     into a database.
 
-    :param codes: a list of zipcodes
+    :param codes: a list of zipcodes or geo coordinate pairs
     :type codes: list of five-digit valid strings of US zip codes
     '''
 
     # Begin a timer for the process and run the request and load process.
     start_start = time.time()
-    print(f'Weather ETL process began at {start_start}')
+    print(f'Weather ETL process began at {time.ctime()}.')
     i, n = 0, 0 # i for counting zipcodes processed and n for counting API
                 # calls made; API calls limited to a maximum 60/minute/apikey.
     start_time = time.time()
@@ -57,17 +58,25 @@ def get_and_make(codes):
         # Try to load the data in the weather.Weather objects. If it can't, do
         # load it the old way in case current and forecasts are dict and list.
         try:
-            db_ops.load(current.as_dict, client, config.database, 'obs_temp')
+            db_ops.load(current.as_dict, config.database, 'obs_temp')
             for cast in forecasts:
-                db_ops.load(cast.as_dict, client, config.database, 'cast_temp')
+                db_ops.load(cast.as_dict, config.database, 'cast_temp')
         except:
             print(f'''There was an error while get_and_make.get_and_make() was
             attempting to load to {client}. Now trying to use request_and_load.
             load_weather() to do the same thing.''')
-            request_and_load.load_weather(current, client, \
-                                          config.database, 'obs_temp')
-            request_and_load.load_weather(forecasts, client, \
-                                          config.database, 'cast_temp')
+            request_and_load.load_weather(
+                current,
+                client,
+                config.database,
+                'obs_temp'
+                )
+            request_and_load.load_weather(
+                forecasts,
+                client,
+                config.database,
+                'cast_temp'
+                )
 
         # If the api request rate is greater than 60 just keep requesting.
         # Otherwise check how many requests have been made, and if it's more
@@ -79,34 +88,26 @@ def get_and_make(codes):
         else:
             i+=1
             if n>=120:
-                make_instants.make_instants(
-                    client,
-                    config.forecast_collection, 
-                    config.observation_collection,
-                    config.instants_collection
-                )
+                make_instants.make_instants()
                 if time.time() - start_time < 60:
                     print(f'Waiting {start_time+60 - time.time()} seconds before resuming API calls.')
-                    time.sleep(start_time - time.time() + 60)
+                    time.sleep(abs(start_time - time.time() + 60))
                     start_time = time.time()
                 n = 0
 
     # Sort the last of the documents in temp collections
     try:
-        make_instants.make_instants(client)
+        make_instants.make_instants()
     except:
         print('No more documents to sort into instants')
     print(f'''Weather ETL process has concluded.
     It took {time.time() - start_start} seconds and processed {i} locations''')
 
 if __name__ == '__main__':
-    ### Commented after update to get current by geocoord was made. ###
 #     directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
-#     filename = os.path.join(directory, 'ETL', 'resources', 'success_zipsNC.csv')
+#     filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
 #     codes = read_list_from_file(filename)
 
-    client = MongoClient(config.host, config.port)
-    
     # Create a geohash list and convert it to a list of coordinate locations
     # from a geohash list.
     b32 = '0123456789bcdefghjkmnpqrstuvwxyz'
@@ -118,6 +119,6 @@ if __name__ == '__main__':
         cd['lat'] = geohash.decode(row)[1]
         locations.append(cd)
 
-    get_and_make(locations)
-#     get_and_make(codes)
-    client.close()
+    limit = 2
+    print(f'The number of locations is limited to {limit}.')
+    get_and_make(locations[:limit])
