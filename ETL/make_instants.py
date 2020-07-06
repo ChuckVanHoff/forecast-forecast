@@ -18,9 +18,8 @@ import config
 # use the local host and port for all the primary operations
 port = config.port #27017
 host = config.host #'localhost'
-client = MongoClient(host=host, port=port)
 
-def find_data(client, database, collection, filters={}):
+def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
 
     :param client: a MongoClient instance
@@ -39,9 +38,12 @@ def find_data(client, database, collection, filters={}):
     :type: pymongo.cursor.CursorType
     '''
 
+    client = MongoClient(host, port)
     db = Database(client, database)
     col = Collection(db, collection)
-    return col.find(filters).batch_size(100)
+    data = col.find(filters).batch_size(100)
+    client.close()
+    return data
 
 def update_command_for(data):
     ''' the 'update command' is the MongoDB command that is used to update data
@@ -87,43 +89,11 @@ def make_load_list_from_cursor(cursor):
         return update_list
     except:
         print('Error making load_list')
-        exit()
-        
-def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ''' Move or copy a collection within and between databases. 
-    
-    :param col: the collection to be copied
-    :type col: a pymongo collection or 
-    :param destination_col: the collection you want the documents copied into
-    :type destination_col: a pymongo.collection.Collection object
-    :param destination_db: the database with the collection you want the
-    documents copied into
-    :type destination_db: a pymongo database pymongo.databse.Database
-    :param filters: a filter for the documents to be copied from the collection.
-    :type filters: dict
-    :param delete: Determine if the orignials should be deleted. Default is no.
-    :type delete: bool
-    '''
-
-    copy = []
-    for item in col.find(filters):
-        copy.append(item)
-    destination = db_ops.dbncol(client, destination_col, destination_db)    
-    try:
-        inserted_ids = destination.insert_many(copy).inserted_ids
-        if delete == True:
-            # remove all the documents from the original collection
-            for row in inserted_ids:
-                filters = {'_id': row}
-                col.delete_one(filters)
-    except pymongo.errors.BulkWriteError as e:
-        print(f'The documents have not been copied to {destination_col}.')
-        print(e)
     return
 
-def make_instants(client):
+def make_instants():
     ''' Make the instant documents, as many as you can, with the data in the
-    named database. 
+    named database.
     
     - Process: Connect to the database, get the data from the database, make a
     list lf load commands to get each document sorted into its proper instant
@@ -132,13 +102,14 @@ def make_instants(client):
     :param client: a MongoDB client
     :type client: pymongo.MongoClient
     '''
-    
-    #Get the data
+
+    client = MongoClient(host, port)
+    # Get the data.
     cast_col = db_ops.dbncol(client, "cast_temp", config.database)
     obs_col = db_ops.dbncol(client, "obs_temp", config.database)
     inst_col = db_ops.dbncol(client, "instant_temp", config.database)
-    forecasts = cast_col.find({})
-    observations = obs_col.find({})
+    forecasts = cast_col.find({}).batch_size(100)
+    observations = obs_col.find({}).batch_size(100)
     
     inst_col.create_index([('timeplace', pymongo.DESCENDING)])
     
@@ -149,6 +120,8 @@ def make_instants(client):
     inst_col.bulk_write(obs_load_list)
     
     # Copy the docs to archive storage and delete the source data.
-    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
-    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+    # db_ops.copy_docs(cast_col, config.database, 'cast_archive', delete=True)
+    # db_ops.copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+
+    client.close()
     return
