@@ -17,7 +17,6 @@ import make_instants
 import config
 from config import OWM_API_key_loohoo as loohoo_key
 from config import OWM_API_key_masta as masta_key
-from config import port, host #, user, password, socket_path
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,7 +40,7 @@ def get_and_make(codes):
 
     # Begin a timer for the process and run the request and load process.
     start_start = time.time()
-    print(f'Weather ETL process began at {start_start}')
+    print(f'Weather ETL process began at {time.ctime()}')
     i, n = 0, 0 # i for counting zipcodes processed and n for counting API
                 # calls made; API calls limited to a maximum 60/minute/apikey.
     start_time = time.time()
@@ -80,10 +79,15 @@ def get_and_make(codes):
         else:
             i+=1
             if n>=120:
-                make_instants.make_instants(client)
+                make_instants.make_instants(
+                    client,
+                    config.forecast_collection, 
+                    config.observation_collection,
+                    config.instants_collection
+                )
                 if time.time() - start_time < 60:
                     print(f'Waiting {start_time+60 - time.time()} seconds before resuming API calls.')
-                    time.sleep(start_time - time.time() + 60)
+                    time.sleep(abs(start_time - time.time() + 60))
                     start_time = time.time()
                 n = 0
 
@@ -96,12 +100,12 @@ def get_and_make(codes):
     It took {time.time() - start_start} seconds and processed {i} locations''')
 
 if __name__ == '__main__':
-    # This try block is to deal with the switching back and forth between
-    # computers with different directory names.
+    ### Commented after update to get current by geocoord was made. ###
 #     directory = os.path.join(os.environ['HOME'], 'data', 'forecast-forecast')
-#     filename = os.path.join(directory, 'ETL', 'Extract', 'resources', 'success_zipsNC.csv')
+#     filename = os.path.join(directory, 'ETL', 'resources', 'success_zipsNC.csv')
 #     codes = read_list_from_file(filename)
-    client = MongoClient(host=host, port=port)
+
+    client = MongoClient(config.host, config.port)
     
     # Create a geohash list and convert it to a list of coordinate locations
     # from a geohash list.
@@ -114,6 +118,6 @@ if __name__ == '__main__':
         cd['lat'] = geohash.decode(row)[1]
         locations.append(cd)
 
-    get_and_make(locations[:61])
-#     get_and_make(codes[:61])
-    client.close()
+    limit = 61
+    print(f'The number of locations is limited to {limit}.')
+    get_and_make(locations[:limit])

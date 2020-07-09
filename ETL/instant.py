@@ -61,6 +61,7 @@ class Instant:
                           )
         return
 
+
 def convert(instants):
     ### THIS FUNCTION IS UNPROVEN ###
     ''' Convert a list of instants to instant.Instant objects.
@@ -118,8 +119,8 @@ def sweep(instants):
     import config
     import db_ops
     
-    client = MongoClient('localhost', 27017)
-    col = db_ops.dbncol(client, 'instant_temp', config.database)
+    client = MongoClient(config.host, config.port)
+    col = db_ops.dbncol(client, config.instants_collection, config.database)
     n = 0
     # Check the instant type- it could be a dict if it came from the database,
     # or it could be a list if it's a bunch of instant objects, or a pymongo
@@ -185,13 +186,13 @@ def load_legit(legit):
     import config
     import db_ops
     
-    client = MongoClient('localhost', 27017)
+    client = MongoClient(config.host, config.port)
     remote_col = db_ops.dbncol(db_ops.Client(config.uri),
                                'legit_inst',
                                config.database
                               )
     col = db_ops.dbncol(client,
-                        'instant_temp',
+                        config.instants_collection,
                         config.database
                        )
     if not isinstance(legit, dict):
@@ -224,12 +225,11 @@ if __name__ == '__main__':
     start_time = time.time() # This is to get the total runtime if this script is
                              # run as __main__
     print('Database sweep in progress...')
-    collection = 'instant_temp'
+    collection = config.instants_collection
     col = db_ops.dbncol(db_ops.Client(config.uri),
-                        collection,
+                        config.instants_collection,
                         config.database)
-    instants = db_ops.read_to_dict(col.find({}))
+    instants = db_ops.read_to_dict(col)
     find_legit(instants, and_load=True)
-#     col.bulk_write(load_list)
-    sweep(col.find({}))
+    sweep(col.find({}).batch_size(100))
     print(f'Total sweep time was {time.time()-start_time} seconds')

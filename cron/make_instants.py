@@ -56,15 +56,17 @@ def update_command_for(data):
     
     
     if data['_type'] == 'forecast':
-        filters = {'_id': data['_id']}
+        filters = {'_id': data['timeplace']}
         updates = {'$push': {'forecasts': data}} # append to forecasts list
         return pymongo.UpdateOne(filters, updates,  upsert=True)
     elif data['_type'] == 'observation':
-        filters = {'_id': data['_id']}
+        filters = {'_id': data['timeplace']}
         updates = {'$set': {'observation': data}}
         return pymongo.UpdateOne(filters, updates,  upsert=True)
     else:
-        print('There was neither "forecast" nor "observation" as "_type".')
+        filters = {'_id': 'update_command_for(data)error'}
+        updates = {'$set': {'errors': data}}
+        return pymongo.UpdateOne(filters, updates,  upsert=True)
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -82,11 +84,12 @@ def make_load_list_from_cursor(cursor):
         n=0
         for obj in cursor:
             update_list.append(update_command_for(obj))
+            n+=1
         return update_list
     except:
         print('Error making load_list')
-        exit()
-        
+        return load_list[:n]
+
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     ''' Move or copy a collection within and between databases. 
     
@@ -145,20 +148,23 @@ def make_instants(client, cast_col, obs_col, inst_col):
     obs_load_list = make_load_list_from_cursor(observations)
     cast_inserted = inst_col.bulk_write(cast_load_list).upserted_ids
     obs_inserted = inst_col.bulk_write(obs_load_list).upserted_ids
-    
-    # Copy the docs to archive storage and delete the source data.
+
+#    # Copy the docs to archive storage and delete the source data.
 #    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
 #    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+
     # Delete the used documents. The data is all contained in the insants, so
     # there's no reason to keep it around taking up space.
     cast_update_list = []
     obs_update_list = []
-    for c_id in cast_inserted:
+    for c_id in cast_inserted.values():
         c_id = {'_id': c_id}
         cast_update_list.append(pymongo.operations.DeleteOne(c_id))
-    for o_id in obs_inserted:
+    for o_id in obs_inserted.values():
         o_id = {'_id': o_id}
         obs_update_list.append(pymongo.operations.DeleteOne(o_id))
-    cast_col.bulk_write(cast_update_list)
-    cast_col.bulk_write(obs_update_list)
+    if cast_update_list:
+        cast_col.bulk_write(cast_update_list)
+    if obs_update_list:
+        obs_col.bulk_write(obs_update_list)
     return

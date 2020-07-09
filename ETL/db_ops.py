@@ -77,7 +77,7 @@ def Client(uri):
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database):
+def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -105,16 +105,20 @@ def dbncol(client, collection, database):
     col = Collection(db, collection)
     return col
 
-def read_to_dict(collection):
+def read_to_dict(collection, query={}, limit=None):
     ''' Read the colleciton to a dictionary.
-    
+
     :param collection: MongoDB collection
     :type collection: pymongo.collection.Collection
+    :param query: the collection query
+    :type query: a mongodb appropriate, dictionary-style dict
+    :param limit: a value that will limit the returned documents read to dict
+    :type limit: int It must be less than or equal to the number of docs on the
+    returned cursor.
     '''
-    col = {}
-    for doc in collection:
-        col['_id'] = doc
-    return col
+ 
+    cursor = collection.find(query).batch_size(100)[:limit]
+    return {curs.pop('_id'): curs for curs in cursor}
 
 def load(data, client, database, collection):
     ''' Load data to specified database collection. Also checks for a
@@ -161,7 +165,6 @@ def load(data, client, database, collection):
             return(f'DuplicateKeyError, could not insert data to {collection}')
 
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ### THIS DOES NOT WORK ###
     ''' move or copy a collection within and between databases 
     
     :param col: the collection to be copied
@@ -174,21 +177,23 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     By default all collection docs will be copied
     :type filters: dict
     '''
-    client = Client(host=host, port=port)
-    original = col.find(filters).batch_size(1000)
+    temp_client = Client(host=host, port=port)
+    original = col.find(filters).batch_size(100)
     copy = []
     for item in original:
         copy.append(item)
         
     database = destination_db     # Define database and collection
     collection = destination_col  # for the following operations.
-    destination = dbncol(client, collection, database)
+    destination = dbncol(temp_client, collection, database)
     inserted_ids = destination.insert_many(copy).inserted_ids
     if delete == True:
         # remove all the inserted documents from the origin collection.
-        for item in inserted_ids:
+        for item in inserted_ids.values():
             filter = {'_id': item}
             col.delete_one(filter)
         print(f'MOVED docs from {col} to {destination}.')
     else:
         print(f'COPIED docs in {col} to {destination}.')
+    temp_client.close()
+    

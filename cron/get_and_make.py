@@ -40,7 +40,7 @@ def get_and_make(codes):
 
     # Begin a timer for the process and run the request and load process.
     start_start = time.time()
-    print(f'Weather ETL process began at {start_start}')
+    print(f'Weather ETL process began at {time.ctime()}')
     i, n = 0, 0 # i for counting zipcodes processed and n for counting API
                 # calls made; API calls limited to a maximum 60/minute/apikey.
     start_time = time.time()
@@ -87,7 +87,7 @@ def get_and_make(codes):
                 )
                 if time.time() - start_time < 60:
                     print(f'Waiting {start_time+60 - time.time()} seconds before resuming API calls.')
-                    time.sleep(start_time - time.time() + 60)
+                    time.sleep(abs(start_time - time.time() + 60))
                     start_time = time.time()
                 n = 0
 
@@ -118,6 +118,6 @@ if __name__ == '__main__':
         cd['lat'] = geohash.decode(row)[1]
         locations.append(cd)
 
-    get_and_make(locations)
-#     get_and_make(codes)
-    client.close()
+    limit = 61
+    print(f'The number of locations is limited to {limit}.')
+    get_and_make(locations[:limit])
