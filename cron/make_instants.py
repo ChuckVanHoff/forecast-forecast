@@ -18,7 +18,7 @@ import config
 # use the local host and port for all the primary operations
 port = config.port #27017
 host = config.host #'localhost'
-client = MongoClient(host=host, port=port)
+client = MongoClient(host, port)
 
 def find_data(client, database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
@@ -39,8 +39,9 @@ def find_data(client, database, collection, filters={}):
     :type: pymongo.cursor.CursorType
     '''
 
-    db = Database(client, database)
-    col = Collection(db, collection)
+#     db = Database(client, database)
+#     col = Collection(db, collection)
+    col = db_ops.dbncol(client, database, collection)
     return col.find(filters).batch_size(100)
 
 def update_command_for(data):

@@ -36,7 +36,7 @@ class Instant:
         :return: Boolian value (True or False)
         '''
         
-        self.count()
+#         self.count()
         if self.count == 40:
             return True
         else:
@@ -66,18 +66,99 @@ def convert(instants):
     ### THIS FUNCTION IS UNPROVEN ###
     ''' Convert a list of instants to instant.Instant objects.
     
-    :param instants: dict of instants
-    
+    :param instants: the instants
+    :type instants: This function is able to handle multiple types-
+        dict: must be a dict of dicts and sets the instant timeplace to
+            whatever the primary keys are.
+        pymongo.collection.Collection: the collection will be converted to a
+            cursor. It must have the same data fields that the dictionary must.
+        pymongo.cursor.CursorType: A cursor over a collection query result.
+            It has to have the same data that the dict has to have.
+            
     :return: dict of instant.Instant objects
     '''
+    
+    import pymongo
+    from pymongo.cursor import CursorType
+    
     converted = {}
-    for key, value in instants:
-        converted[key] = instant.Instant(
-            value['timeplace'],
-            value['forecasts'],
-            value['observation']
-        )
-    return converted
+    try:
+        if isinstance(instants, dict):
+            print('converting a dict')
+            for key, value in instants.items():
+                if 'observation' in value:
+                    converted[key] = Instant(
+                        key,
+                        value['forecasts'],
+                        value['observation']
+                    )
+                elif 'observations' in value:
+                    converted[key] = Instant(
+                        key,
+                        value['forecasts'],
+                        value['observations']
+                    )
+                else:
+                    converted[key] = Instant(
+                        key,
+                        value['forecasts']
+                    )
+            return converted
+        elif isinstance(instants, pymongo.collection.Collection):
+            print('converting a collection:')
+            for doc in instants.find({}):
+                if 'observation' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif  'observations' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif 'observations' not in doc and 'observation' not in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts']
+                        )
+                else:
+                    continue
+            return converted
+        elif type(instants) == pymongo.cursor.CursorType:
+            print('converting a cursor')
+            for doc in instants:
+                if 'observation' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif  'observations' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif 'observations' not in doc and 'observation' not in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts']
+                        )
+                else:
+                    continue
+            return converted
+    except KeyError as e:
+        print(f'KeyError {e}')
+        return converted
         
 def cast_count_all(instants):
     ''' get a tally for the forecast counts per document 
@@ -93,7 +174,11 @@ def cast_count_all(instants):
     # Go through each doc in the collection and count the number of items in
     # the forecasts array. Add to the tally for that count.
     for doc in instants:
-        n = len(doc['forecasts'])
+        if 'forecasts' in doc:
+            n = len(doc['forecasts'])
+        else:
+            print('doc did not have forecasts as a key.')
+            continue
         if n in collection_cast_counts:
             collection_cast_counts[n] += 1
         else:
@@ -126,7 +211,7 @@ def sweep(instants):
     # or it could be a list if it's a bunch of instant objects, or a pymongo
     # cursor over the database.
     if type(instants) == dict:
-        for key, doc in instants:
+        for key, doc in instants.items():
             if key['instant'] < time.time()-453000:  # 453000sec: about 5 days
                 col.delete_one(doc)
                 n += 1
@@ -148,24 +233,28 @@ def find_legit(instants, and_load=True):
     ''' find the 'legit' instants within the list
 
      :param instants: all the instants pulled from the database
-     :type instants: list
+     :type instants: dict of dicts
      :return: list of instants with a complete forecasts array
      '''
+    ### ADD FUNCTIONALITY TO ALLOW PROCESSING OF DICT, LIST, CURSOR, COL ###
+    inst = convert(instants) # Convert the values of instants to Instants
+    del instants
     
-    legit_dict = {}
-    legit_load_list = []
-    instants = convert(instants)
+    print(type(inst))
     # Make a load list out of the Instants
     if and_load:
-        for key, value in instants:
+        legit_load_list = []
+        for key, value in inst.items():
             if value.itslegit:
                 legit_load_list.append(update_command_for(value.as_dict))
         print(f'Got the legit_load_list and it is this long: {len(legit_load_list)}')
-        if len(legit_load_list) == 0:
-            pass
-        load_legit(legit_load_list)
+        if len(legit_load_list) != 0:
+            load_legit(legit_load_list)
+        del legit_load_list
+
     # Make a lisf of legit instants and return it.
-    for key, value in instants:
+    legit_dict = {}
+    for key, value in inst.items():
         if value.itslegit:
             legit_dict[value.timeplace] = value.as_dict
     return legit_dict
@@ -229,7 +318,6 @@ if __name__ == '__main__':
     col = db_ops.dbncol(db_ops.Client(config.uri),
                         config.instants_collection,
                         config.database)
-    instants = db_ops.read_to_dict(col)
-    find_legit(instants, and_load=True)
+    find_legit(collection, and_load=True)
     sweep(col.find({}).batch_size(100))
     print(f'Total sweep time was {time.time()-start_time} seconds')

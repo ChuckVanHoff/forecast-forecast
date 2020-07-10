@@ -116,8 +116,11 @@ def read_to_dict(collection, query={}, limit=None):
     :type limit: int It must be less than or equal to the number of docs on the
     returned cursor.
     '''
- 
-    cursor = collection.find(query).batch_size(100)[:limit]
+
+    if limit:
+        cursor = collection.find(query).batch_size(100)[:limit]
+    else:
+        cursor = collection.find(query).batch_size(100)
     return {curs.pop('_id'): curs for curs in cursor}
 
 def load(data, client, database, collection):
