@@ -34,13 +34,13 @@ def get_and_make(codes):
     ''' Request weather data from the OWM api. Transform and load that data
     into a database.
 
-    :param codes: a list of zipcodes
+    :param codes: a list of zipcodes or geo coordinate pairs
     :type codes: list of five-digit valid strings of US zip codes
     '''
 
     # Begin a timer for the process and run the request and load process.
     start_start = time.time()
-    print(f'Weather ETL process began at {time.ctime()}')
+    print(f'Weather ETL process began at {time.ctime()}.')
     i, n = 0, 0 # i for counting zipcodes processed and n for counting API
                 # calls made; API calls limited to a maximum 60/minute/apikey.
     start_time = time.time()
@@ -57,17 +57,25 @@ def get_and_make(codes):
         # Try to load the data in the weather.Weather objects. If it can't, do
         # load it the old way in case current and forecasts are dict and list.
         try:
-            db_ops.load(current.as_dict, client, config.database, 'obs_temp')
+            db_ops.load(current.as_dict, config.database, 'obs_temp')
             for cast in forecasts:
-                db_ops.load(cast.as_dict, client, config.database, 'cast_temp')
+                db_ops.load(cast.as_dict, config.database, 'cast_temp')
         except:
             print(f'''There was an error while get_and_make.get_and_make() was
             attempting to load to {client}. Now trying to use request_and_load.
             load_weather() to do the same thing.''')
-            request_and_load.load_weather(current, client, \
-                                          config.database, 'obs_temp')
-            request_and_load.load_weather(forecasts, client, \
-                                          config.database, 'cast_temp')
+            request_and_load.load_weather(
+                current,
+                client,
+                config.database,
+                'obs_temp'
+                )
+            request_and_load.load_weather(
+                forecasts,
+                client,
+                config.database,
+                'cast_temp'
+                )
 
         # If the api request rate is greater than 60 just keep requesting.
         # Otherwise check how many requests have been made, and if it's more
@@ -93,7 +101,7 @@ def get_and_make(codes):
 
     # Sort the last of the documents in temp collections
     try:
-        make_instants.make_instants(client)
+        make_instants.make_instants()
     except:
         print('No more documents to sort into instants')
     print(f'''Weather ETL process has concluded.
@@ -106,7 +114,7 @@ if __name__ == '__main__':
 #     codes = read_list_from_file(filename)
 
     client = MongoClient(config.host, config.port)
-    
+
     # Create a geohash list and convert it to a list of coordinate locations
     # from a geohash list.
     b32 = '0123456789bcdefghjkmnpqrstuvwxyz'

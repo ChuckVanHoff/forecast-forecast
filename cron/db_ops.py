@@ -7,16 +7,18 @@ from pymongo.database import Database
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
 from pymongo.errors import InvalidDocument, OperationFailure, ConfigurationError
-### no need to have the url encoding anymore
-# from urllib.parse import quote
 
-### removed this line ###
-# database = 'test'
+import config
 
+host = config.host
+port = config.port
+uri = config.uri
 
-def check_db_access(client):
+def check_db_access():
     '''A check that there is write access to the database'''
  
+    client = MongoClient(host, port)
+    
     try:
         client.admin.command('ismaster')
     except ConnectionFailure:
@@ -77,7 +79,7 @@ def Client(uri):
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
+def dbncol(client, collection, database):
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -105,7 +107,7 @@ def dbncol(client, collection, database): ###=database): I don't think this is n
     col = Collection(db, collection)
     return col
 
-def read_to_dict(collection, query={}, limit=None):
+def read_mongo_to_dict(collection, query={}, limit=None):
     ''' Read the colleciton to a dictionary.
 
     :param collection: MongoDB collection
@@ -138,6 +140,7 @@ def load(data, client, database, collection):
     :type collection: str
     '''
 
+    client = MongoClient(host, port)
     col = dbncol(client, collection, database)
 
     # set the appropriate database collections, filters and update types
@@ -149,6 +152,7 @@ def load(data, client, database, collection):
             # there is, update it, if there isn't, upsert it.
             return col.find_one_and_update(filters, updates,  upsert=True)
         except DuplicateKeyError:
+            client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
     elif collection == 'observed' \
         or collection == 'forecasted' \
@@ -156,19 +160,23 @@ def load(data, client, database, collection):
         or collection == 'cast_temp':
         try:
             col.insert_one(data)
+            client.close()
             return
         except DuplicateKeyError:
+            client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
     else:
         try:
             filters = {'zipcode':data['zipcode'], 'instant':data['instant']}
             updates = {'$set': {'forecasts': data}} # append to forecasts list
+            client.close()
             return col.find_one_and_update(filters, updates,  upsert=True)
         except DuplicateKeyError:
+            client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
 
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ''' move or copy a collection within and between databases 
+    ''' Move or copy a collection within and between databases 
     
     :param col: the collection to be copied
     :type col: a pymongo collection
@@ -180,7 +188,8 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     By default all collection docs will be copied
     :type filters: dict
     '''
-    temp_client = Client(host=host, port=port)
+
+    temp_client = MongoClient(host, port)  # temp_client for the destination db
     original = col.find(filters).batch_size(100)
     copy = []
     for item in original:
@@ -190,13 +199,20 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     collection = destination_col  # for the following operations.
     destination = dbncol(temp_client, collection, database)
     inserted_ids = destination.insert_many(copy).inserted_ids
-    if delete == True:
-        # remove all the inserted documents from the origin collection.
-        for item in inserted_ids.values():
-            filter = {'_id': item}
-            col.delete_one(filter)
-        print(f'MOVED docs from {col} to {destination}.')
-    else:
-        print(f'COPIED docs in {col} to {destination}.')
-    temp_client.close()
+    try:
+        inserted_ids = destination.insert_many(copy).inserted_ids
+        if delete == True:
+            # remove all the documents from the original collection
+            for row in inserted_ids:
+                filters = {'_id': row}
+                gotit = col.delete_one(filters)
+                if not gotit:
+                    print(f'db_ops.copy_docs....did not delete {row} from {col}.')
+        else:
+            client.close()
+            print(f'COPIED docs in {col} to {destination}.')
+    except pymongo.errors.BulkWriteError as e:
+        print(f'The documents have not been copied to {destination_col}.')
+        print(e)
+    return
     

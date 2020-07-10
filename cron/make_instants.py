@@ -20,7 +20,7 @@ port = config.port #27017
 host = config.host #'localhost'
 client = MongoClient(host, port)
 
-def find_data(client, database, collection, filters={}):
+def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
 
     :param client: a MongoClient instance
@@ -39,8 +39,6 @@ def find_data(client, database, collection, filters={}):
     :type: pymongo.cursor.CursorType
     '''
 
-#     db = Database(client, database)
-#     col = Collection(db, collection)
     col = db_ops.dbncol(client, database, collection)
     return col.find(filters).batch_size(100)
 
@@ -55,19 +53,33 @@ def update_command_for(data):
     :return: the command that will be used to find and update documents
     ''' 
     
-    
-    if data['_type'] == 'forecast':
-        filters = {'_id': data['timeplace']}
-        updates = {'$push': {'forecasts': data}} # append to forecasts list
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    elif data['_type'] == 'observation':
-        filters = {'_id': data['timeplace']}
-        updates = {'$set': {'observation': data}}
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    else:
-        filters = {'_id': 'update_command_for(data)error'}
-        updates = {'$set': {'errors': data}}
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
+    try:
+		if data['_type'] == 'forecast':
+			filters = {'_id': data['timeplace']}
+			updates = {'$push': {'forecasts': data}} # append to forecasts list
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		elif data['_type'] == 'observation':
+			filters = {'_id': data['timeplace']}
+			updates = {'$set': {'observation': data}}
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		else:
+			filters = {'_id': 'update_command_for(data)error'}
+			updates = {'$set': {'errors': data}}
+	        return pymongo.UpdateOne(filters, updates,  upsert=True)
+	except:
+		if data['_type'] == 'forecast':
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$push': {'forecasts': data}} # append to forecasts list
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		elif data['_type'] == 'observation':
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$set': {'observations': data}}
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		else:
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$set': data}
+			print('made load command for an instant')
+	        return pymongo.UpdateOne(filters, updates,  upsert=True)
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -123,9 +135,9 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
         print(e)
     return
 
-def make_instants(client, cast_col, obs_col, inst_col):
+def make_instants():
     ''' Make the instant documents, as many as you can, with the data in the
-    named database. 
+    named database.
     
     - Process: Connect to the database, get the data from the database, make a
     list lf load commands to get each document sorted into its proper instant
@@ -134,13 +146,14 @@ def make_instants(client, cast_col, obs_col, inst_col):
     :param client: a MongoDB client
     :type client: pymongo.MongoClient
     '''
-    
-    #Get the data
-    cast_col = db_ops.dbncol(client, cast_col, config.database)
-    obs_col = db_ops.dbncol(client, obs_col, config.database)
-    inst_col = db_ops.dbncol(client, inst_col, config.database)
-    forecasts = cast_col.find({})
-    observations = obs_col.find({})
+
+    client = MongoClient(host, port)
+    # Get the data.
+    cast_col = db_ops.dbncol(client, "cast_temp", config.database)
+    obs_col = db_ops.dbncol(client, "obs_temp", config.database)
+    inst_col = db_ops.dbncol(client, "instant_temp", config.database)
+    forecasts = cast_col.find({}).batch_size(100)
+    observations = obs_col.find({}).batch_size(100)
     
     inst_col.create_index([('timeplace', pymongo.DESCENDING)])
     

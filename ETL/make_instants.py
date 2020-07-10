@@ -20,7 +20,7 @@ port = config.port #27017
 host = config.host #'localhost'
 client = MongoClient(host, port)
 
-def find_data(client, database, collection, filters={}):
+def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
 
     :param client: a MongoClient instance
@@ -39,8 +39,6 @@ def find_data(client, database, collection, filters={}):
     :type: pymongo.cursor.CursorType
     '''
 
-#     db = Database(client, database)
-#     col = Collection(db, collection)
     col = db_ops.dbncol(client, database, collection)
     return col.find(filters).batch_size(100)
 
@@ -125,7 +123,7 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
 
 def make_instants(client, cast_col, obs_col, inst_col):
     ''' Make the instant documents, as many as you can, with the data in the
-    named database. 
+    named database.
     
     - Process: Connect to the database, get the data from the database, make a
     list lf load commands to get each document sorted into its proper instant

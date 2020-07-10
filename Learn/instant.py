@@ -1,14 +1,21 @@
-''' Defines the Instant class and some useful functions. '''
+''' Defines the Instant class and some useful functions. When executed as main
+this module will search the database for completed and incompletable Instants
+and move the completed to a remote database-collection, legit_inst, and delete
+all the incompletable instants.'''
 
 
 class Instant:
+    ''' The Instant is an object built out of a collection of Weathers: in the
+    case of forecast-forecast there are 40 forecast dictionaries contained in a
+    list and one observation dictionary for comparison.
+    '''
 
-    def __init__(self, _id, forecasts=[], observations={}):
+    def __init__(self, timeplace, forecasts=[], observations={}):
         
-        self._id = _id
+        self.timeplace = timeplace
         self.casts = forecasts
         self.obs = observations
-        self.as_dict = {'_id': self._id,
+        self.as_dict = {'timeplace': self.timeplace,
                         'forecasts': self.casts,
                         'observations': self.obs
                         }
@@ -21,11 +28,12 @@ class Instant:
     
     @property
     def itslegit(self):
-        ''' Check the instant's weathers array's count and if it is 40, then the
-        document is returned.
+        ''' Check the instant's weathers array's count and if it is 40, then
+        True is returned, otherwise it returns False.
 
         :param instant: the instant docuemnt to be legitimized
         :type instant: dictionary
+        :return: Boolian value (True or False)
         '''
         
         self.count()
@@ -41,27 +49,39 @@ class Instant:
         :type collection: string
         '''
 
-        from config import database
-        from db_ops import dbncol
+        import config
+        import db_ops
+        
+        col = db_ops.dbncol(client, collection, config.database)
+        
+        if self.itslegit:
+            col.update_one({'timeplace': self.timeplace},
+                           {'$set': self.as_dict},
+                           upsert=True
+                          )
+        return
 
-        col = dbncol(client, collection, database=database)
-        col.update_one({'_id': self._id}, {'$set': self.as_dict}, upsert=True)
-        
-    def as_delta(self):
-        ''' Create an Instant delta object. It finds the delta between the 
-        observation and each forecast and returns a list of deltas. '''
-        
-        from delta import make_delta
-        
-        # Loop through the forecasts array and append the return of make_delta()
-        # to and deltas list before returning that list.
-        return [make_delta(cast, self.obs) for cast in self.casts]
-
+def convert(instants):
+    ### THIS FUNCTION IS UNPROVEN ###
+    ''' Convert a list of instants to instant.Instant objects.
     
+    :param instants: dict of instants
+    
+    :return: dict of instant.Instant objects
+    '''
+    converted = {}
+    for key, value in instants:
+        converted[key] = instant.Instant(
+            value['timeplace'],
+            value['forecasts'],
+            value['observation']
+        )
+    return converted
+        
 def cast_count_all(instants):
     ''' get a tally for the forecast counts per document 
 
-    :param instants: docmuments loaded from the db.instants collection ### NOT
+    :param instants: docmuments loaded from the db.instants collection
     Instant class objects
     :type instants: list
     '''
@@ -73,9 +93,6 @@ def cast_count_all(instants):
     # the forecasts array. Add to the tally for that count.
     for doc in instants:
         n = len(doc['forecasts'])
-        # Move the legit instants to the permenant database
-        if n >= 40:
-            load_legit(doc)
         if n in collection_cast_counts:
             collection_cast_counts[n] += 1
         else:
@@ -84,22 +101,25 @@ def cast_count_all(instants):
 
 
 def sweep(instants):
+    ### THIS FUNCTION IS DOING NOTHING IF IT REFERS TO ANY 'instant' KEY ###
     ''' Move any instant that has a ref_time less than the current next
     ref_time and with self.count less than 40. This is getting rid of the
-    instnats that are not and will never be legit. 
+    instants that are not and will not ever be legit.
 
-    :param instants: a list of Instant objects
+    :param instants: a itterable of Instant objects
+    :type instants: dict, list, pymongo cursor
     '''
     
     import time
     
     import pymongo
+    from pymongo import MongoClient
     from pymongo.cursor import Cursor
-    from Extract.make_instants import find_data
-    from config import client, database
-    from db_ops import dbncol
+    import config
+    import db_ops
     
-    col = dbncol(client, 'instant_temp', database=database)
+    client = MongoClient('localhost', 27017)
+    col = db_ops.dbncol(client, 'instant_temp', config.database)
     n = 0
     # Check the instant type- it could be a dict if it came from the database,
     # or it could be a list if it's a bunch of instant objects, or a pymongo
@@ -123,127 +143,93 @@ def sweep(instants):
         print(f'You want me to sweep instants that are {type(instants)}\'s.')
     return
 
-def find_legit(instants):
-    ### THIS DOES NOT WORK ###
+def find_legit(instants, and_load=True):
     ''' find the 'legit' instants within the list
 
      :param instants: all the instants pulled from the database
      :type instants: list
      :return: list of instants with a complete forecasts array
      '''
+    
+    legit_dict = {}
+    legit_load_list = []
+    instants = convert(instants)
+    # Make a load list out of the Instants
+    if and_load:
+        for key, value in instants:
+            if value.itslegit:
+                legit_load_list.append(update_command_for(value.as_dict))
+        print(f'Got the legit_load_list and it is this long: {len(legit_load_list)}')
+        if len(legit_load_list) == 0:
+            pass
+        load_legit(legit_load_list)
+    # Make a lisf of legit instants and return it.
+    for key, value in instants:
+        if value.itslegit:
+            legit_dict[value.timeplace] = value.as_dict
+    return legit_dict
 
-    i = [item for item in instants if len(item['forecasts']) >= 40]
-    return f'legit list is {len(i)} items long'
-    ### maybe you should make the instant documents pulled form the database
-    ### represented as Instants in memory. Then you could use the Instant
-    ### methods you've been writing.
-
-
-def load_legit(legit_list):
+def load_legit(legit):
     ''' Load the 'legit' instants to the remote database and delete from temp.
-    This process does not delete the 
+    This process does not delete the documents upon insertion, but rather holds
+    it until the next time, tries to load it then, and finally, when getting a
+    duplicate key error, deletes the document from its temporary location.
 
-    :param collection: the collection you want to pull instants from
-    :type collection: pymongo.collection.Collection
+    :param legit: a single document or a list of update commands
+    :type legit: dict or list
     '''
 
-    from pymongo.errors import DuplicateKeyError
-    from config import client, database
-    from db_ops import dbncol
-    from db_ops import copy_docs
+    from pymongo import MongoClient
+    from pymongo.errors import DuplicateKeyError, InvalidOperation
+
+    import config
+    import db_ops
     
-### this should load to legit_inst in owmap for production ###
-#         col = dbncol(client, 'legit_inst', 'owmap')
-    col = dbncol(client, 'legit_inst', database=database)
-    try:
-        col.insert_one(legit_list)
-    except DuplicateKeyError:
-        col = dbncol(client, 'instant_temp', database=database)
-        col.delete_one(legit_list)
-        ### saved for later, when doing it on bulk ###
-#     col.insert_many(legit_list)
-    # Now go to the temp_instants collection and delete the instants just
-    # loaded to legit_inst.
-#     col.delete_many(legit_list)
+    client = MongoClient('localhost', 27017)
+    remote_col = db_ops.dbncol(db_ops.Client(config.uri),
+                               'legit_inst',
+                               config.database
+                              )
+    col = db_ops.dbncol(client,
+                        'instant_temp',
+                        config.database
+                       )
+    if not isinstance(legit, dict):
+        try:
+            remote_col.bulk_write(legit)
+        except InvalidOperation as e:
+            print(e)
+            client.close()
+            return -1
+    else:
+        try:
+            remote_col.insert_one(legit)
+            print(f'from {type(legit)}, loaded legit')
+        except DuplicateKeyError:
+            col.delete_one(legit)
+    client.close()
     return
 
-def make_delta(cast, obs):
-    ''' Compare the values of two dicts, key by key. When the values are numbers
-    return the difference, when strings return 0 if the strings are equal and 1
-    if they are different, when dicts run this function, when NoneType set the
-    value to 99999.
-    
-    :params cast, obs: dictionaries with the same set of keys and sub-keys
-    :type cas, obs: dict
-    '''
-    
-    delta = {}  # The delta document. Contains all the forecast errors
-    
-    for (k, v) in cast.items():
-        try:
-            # Check and compare dictionaries according to their value type
-            if type(v) == int or type(v) == float:
-                if type(obs[k]) == int or type(obs[k]) == float:
-                    delta[k] = v - obs[k]
-                    continue
-            elif type(v) == dict:
-                delta[k] = make_delta(v, obs[k])
-                continue
-            elif type(v) == str:
-                if v == obs[k]:
-                    delta[k] = 0
-                else:
-                    delta[k] = 1
-            elif type(v):
-                delta[k] = 999999
-                continue
-            else:
-                print(f'there was some other condition not met by the other\
-                checks. Look at {k} and {v}')
-                continue
-        except KeyError as e:
-            print(f'Caught a KeyError..... {e}')
-            # Add whichever key and value needs adding to the delta
-            if k not in obs and '1h' in obs:
-                delta['1h'] = obs['1h']
-                delta[k] = v
-            elif k not in obs and '3h' in obs:
-                delta['3h'] = obs['3h']  
-                delta['1h'] = v
-            continue
-    return delta
 
-def doc_to_inst(doc):
-    ''' Take a document from the instants database and make an Instant object
-    out of it.
-    
-    :param doc: a document from the owmap.legit_inst database
-    :type doc: dictionary
-    '''
-    
-    _id = f"{doc['instant']}{doc['zipcode']}"
-    forecasts = doc['forecasts']
-    observations = doc['weather']
-    return Instant(_id, forecasts, observations)
-
-
-import time
-start_time = time.time() # This is to get the total runtime if this script is
-                         # run as __main__
 if __name__ == '__main__':
     ''' Connect to the database, then move all the legit instants to the remote
     database and clear out any instants that are past and not legit.
     '''
     
+    import time
+    
     import config
     import db_ops
 
-    # Set the database here if you must, but it's better to do that in the
-    # config.py file
-#     database = 'owmap'
+    start_time = time.time() # This is to get the total runtime if this script is
+                             # run as __main__
+    print('Database sweep in progress...')
     collection = 'instant_temp'
-    col = db_ops.dbncol(config.client, collection, database=config.database)
-    cast_count_all(col.find({}))
+    col = db_ops.dbncol(db_ops.Client(config.uri),
+                        collection,
+                        config.database)
+    instants = db_ops.read_mongo_to_dict(col)
+    find_legit(instants, and_load=True)
+#     col.bulk_write(load_list)
     sweep(col.find({}))
-
-    print(f'Total op time for instant.py was {time.time()-start_time} seconds')
+    print(f'Total sweep time was {time.time()-start_time} seconds')
