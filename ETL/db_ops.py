@@ -79,7 +79,7 @@ def Client(uri):
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database):
+def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -108,10 +108,21 @@ def dbncol(client, collection, database):
     return col
 
 def read_mongo_to_dict(collection, query={}, limit=None):
-    """ Read from Mongo and Store into dict """
-    
-    # Make a query to the specific DB and Collection
-    cursor = collection.find(query)[:limit]
+    ''' Read the colleciton to a dictionary.
+
+    :param collection: MongoDB collection
+    :type collection: pymongo.collection.Collection
+    :param query: the collection query
+    :type query: a mongodb appropriate, dictionary-style dict
+    :param limit: a value that will limit the returned documents read to dict
+    :type limit: int It must be less than or equal to the number of docs on the
+    returned cursor.
+    '''
+
+    if limit:
+        cursor = collection.find(query).batch_size(100)[:limit]
+    else:
+        cursor = collection.find(query).batch_size(100)
     return {curs.pop('_id'): curs for curs in cursor}
 
 def load(data, database, collection):

@@ -18,6 +18,7 @@ import config
 # use the local host and port for all the primary operations
 port = config.port #27017
 host = config.host #'localhost'
+client = MongoClient(host, port)
 
 def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
@@ -38,12 +39,8 @@ def find_data(database, collection, filters={}):
     :type: pymongo.cursor.CursorType
     '''
 
-    client = MongoClient(host, port)
-    db = Database(client, database)
-    col = Collection(db, collection)
-    data = col.find(filters).batch_size(100)
-    client.close()
-    return data
+    col = db_ops.dbncol(client, database, collection)
+    return col.find(filters).batch_size(100)
 
 def update_command_for(data):
     ''' the 'update command' is the MongoDB command that is used to update data
@@ -56,19 +53,33 @@ def update_command_for(data):
     :return: the command that will be used to find and update documents
     ''' 
     
-    if data['_type'] == 'forecast':
-        filters = {'timeplace': data['timeplace']}
-        updates = {'$push': {'forecasts': data}} # append to forecasts list
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    elif data['_type'] == 'observation':
-        filters = {'timeplace': data['timeplace']}
-        updates = {'$set': {'observations': data}}
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    else:
-        filters = {'timeplace': data['timeplace']}
-        updates = {'$set': data}
-        print('made load command for an instant')
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
+    try:
+		if data['_type'] == 'forecast':
+			filters = {'_id': data['timeplace']}
+			updates = {'$push': {'forecasts': data}} # append to forecasts list
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		elif data['_type'] == 'observation':
+			filters = {'_id': data['timeplace']}
+			updates = {'$set': {'observation': data}}
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		else:
+			filters = {'_id': 'update_command_for(data)error'}
+			updates = {'$set': {'errors': data}}
+	        return pymongo.UpdateOne(filters, updates,  upsert=True)
+	except:
+		if data['_type'] == 'forecast':
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$push': {'forecasts': data}} # append to forecasts list
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		elif data['_type'] == 'observation':
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$set': {'observations': data}}
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		else:
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$set': data}
+			print('made load command for an instant')
+	        return pymongo.UpdateOne(filters, updates,  upsert=True)
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -86,9 +97,42 @@ def make_load_list_from_cursor(cursor):
         n=0
         for obj in cursor:
             update_list.append(update_command_for(obj))
+            n+=1
         return update_list
     except:
         print('Error making load_list')
+        return load_list[:n]
+
+def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
+    ''' Move or copy a collection within and between databases. 
+    
+    :param col: the collection to be copied
+    :type col: a pymongo collection or 
+    :param destination_col: the collection you want the documents copied into
+    :type destination_col: a pymongo.collection.Collection object
+    :param destination_db: the database with the collection you want the
+    documents copied into
+    :type destination_db: a pymongo database pymongo.databse.Database
+    :param filters: a filter for the documents to be copied from the collection.
+    :type filters: dict
+    :param delete: Determine if the orignials should be deleted. Default is no.
+    :type delete: bool
+    '''
+
+    copy = []
+    for item in col.find(filters):
+        copy.append(item)
+    destination = db_ops.dbncol(client, destination_col, destination_db)    
+    try:
+        inserted_ids = destination.insert_many(copy).inserted_ids
+        if delete == True:
+            # remove all the documents from the original collection
+            for row in inserted_ids:
+                filters = {'_id': row}
+                col.delete_one(filters)
+    except pymongo.errors.BulkWriteError as e:
+        print(f'The documents have not been copied to {destination_col}.')
+        print(e)
     return
 
 def make_instants():
@@ -116,12 +160,25 @@ def make_instants():
     # make the load lists and load the data
     cast_load_list = make_load_list_from_cursor(forecasts)
     obs_load_list = make_load_list_from_cursor(observations)
-    inst_col.bulk_write(cast_load_list)
-    inst_col.bulk_write(obs_load_list)
-    
-    # Copy the docs to archive storage and delete the source data.
-    # db_ops.copy_docs(cast_col, config.database, 'cast_archive', delete=True)
-    # db_ops.copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+    cast_inserted = inst_col.bulk_write(cast_load_list).upserted_ids
+    obs_inserted = inst_col.bulk_write(obs_load_list).upserted_ids
 
-    client.close()
+#    # Copy the docs to archive storage and delete the source data.
+#    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
+#    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+
+    # Delete the used documents. The data is all contained in the insants, so
+    # there's no reason to keep it around taking up space.
+    cast_update_list = []
+    obs_update_list = []
+    for c_id in cast_inserted.values():
+        c_id = {'_id': c_id}
+        cast_update_list.append(pymongo.operations.DeleteOne(c_id))
+    for o_id in obs_inserted.values():
+        o_id = {'_id': o_id}
+        obs_update_list.append(pymongo.operations.DeleteOne(o_id))
+    if cast_update_list:
+        cast_col.bulk_write(cast_update_list)
+    if obs_update_list:
+        obs_col.bulk_write(obs_update_list)
     return
