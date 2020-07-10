@@ -20,7 +20,7 @@ port = config.port #27017
 host = config.host #'localhost'
 client = MongoClient(host, port)
 
-def find_data(client, database, collection, filters={}):
+def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
 
     :param client: a MongoClient instance
@@ -39,14 +39,12 @@ def find_data(client, database, collection, filters={}):
     :type: pymongo.cursor.CursorType
     '''
 
-#     db = Database(client, database)
-#     col = Collection(db, collection)
     col = db_ops.dbncol(client, database, collection)
     return col.find(filters).batch_size(100)
 
 def update_command_for(data):
-    ''' the 'update command' is the MongoDB command that is used to update data
-    should be a weather type object. it will have its filter and update set
+    ''' The 'update command' is the MongoDB command that is used to update data
+    should be a weather type object. It will have its filter and update set
     according to the entry content. It returns a command to update in a pymongo
     database.
 
@@ -55,19 +53,34 @@ def update_command_for(data):
     :return: the command that will be used to find and update documents
     ''' 
     
-    
-    if data['_type'] == 'forecast':
-        filters = {'_id': data['timeplace']}
-        updates = {'$push': {'forecasts': data}} # append to forecasts list
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    elif data['_type'] == 'observation':
-        filters = {'_id': data['timeplace']}
-        updates = {'$set': {'observation': data}}
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    else:
-        filters = {'_id': 'update_command_for(data)error'}
-        updates = {'$set': {'errors': data}}
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
+    try:
+		if data['_type'] == 'forecast':
+			filters = {'_id': data['timeplace']}
+			updates = {'$push': {'forecasts': data}} # append to forecasts list
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		elif data['_type'] == 'observation':
+			filters = {'_id': data['timeplace']}
+			updates = {'$set': {'observation': data}}
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		else:
+			### I am betting that you'll be back here make this stop happening, or
+			### just handle the situation where there's no forecast or observation.
+			filters = {'_id': 'update_command_for(data)error'}
+			updates = {'$set': {'errors': data}}
+	except KeyError as e:
+		if data['_type'] == 'forecast':
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$push': {'forecasts': data}} # append to forecasts list
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		elif data['_type'] == 'observation':
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$set': {'observations': data}}
+			return pymongo.UpdateOne(filters, updates,  upsert=True)
+		else:
+			filters = {'timeplace': data['timeplace']}
+			updates = {'$set': data}
+			print('made load command for an instant')
+	return pymongo.UpdateOne(filters, updates,  upsert=True)
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -91,48 +104,23 @@ def make_load_list_from_cursor(cursor):
         print('Error making load_list')
         return load_list[:n]
 
-def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ''' Move or copy a collection within and between databases. 
-    
-    :param col: the collection to be copied
-    :type col: a pymongo collection or 
-    :param destination_col: the collection you want the documents copied into
-    :type destination_col: a pymongo.collection.Collection object
-    :param destination_db: the database with the collection you want the
-    documents copied into
-    :type destination_db: a pymongo database pymongo.databse.Database
-    :param filters: a filter for the documents to be copied from the collection.
-    :type filters: dict
-    :param delete: Determine if the orignials should be deleted. Default is no.
-    :type delete: bool
-    '''
-
-    copy = []
-    for item in col.find(filters):
-        copy.append(item)
-    destination = db_ops.dbncol(client, destination_col, destination_db)    
-    try:
-        inserted_ids = destination.insert_many(copy).inserted_ids
-        if delete == True:
-            # remove all the documents from the original collection
-            for row in inserted_ids:
-                filters = {'_id': row}
-                col.delete_one(filters)
-    except pymongo.errors.BulkWriteError as e:
-        print(f'The documents have not been copied to {destination_col}.')
-        print(e)
-    return
-
 def make_instants(client, cast_col, obs_col, inst_col):
     ''' Make the instant documents, as many as you can, with the data in the
-    named database. 
+    named database.
     
     - Process: Connect to the database, get the data from the database, make a
     list lf load commands to get each document sorted into its proper instant
-    document, and finally move the sorted documents to their archives.
+    document, and finally move the sorted documents to their archives or delete
+	them (switch using a comment/un-comment of the copy and delete blocks below).
     
     :param client: a MongoDB client
     :type client: pymongo.MongoClient
+	:param cast_col: The collection containing the forecast data you want to use
+	:type cast_col: pymongo.collection.Collection
+	:param obs_col: The collection containing the observation data you want to use
+	:type obs_col: pymongo.collection.Collection
+	:param inst_col: The collection containing the instant data you want to use
+	:type inst_col: pymongo.collection.Collection
     '''
     
     #Get the data

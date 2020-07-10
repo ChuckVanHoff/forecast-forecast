@@ -74,7 +74,7 @@ class Weather:
         if _type == 'forecast':
             self.timeplace = f'{str(location)}{str(data["reference_time"])}'
         elif _type == 'observation':
-            self.timeplace = f'{str(data["location"])}{str(10800 * (data["reference_time"]//10800 + 1))}'
+            self.timeplace = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
         else:
             self.timeplace = weather['timeplace']
         self.as_dict = {'timeplace': self.timeplace, \
@@ -195,7 +195,7 @@ def get_current_weather(location):
             # Transform the data before returning it.
             result = json.loads(result.to_JSON())
             coordinates = result['Location']['coordinates']
-            
+                        
             # Set the reference_time to the nearest instant.
             ref_time = min(
                 abs(10800 * (result['Weather']['reference_time']//10800 + 1)

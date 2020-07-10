@@ -74,7 +74,7 @@ class Weather:
         if _type == 'forecast':
             self.timeplace = f'{str(location)}{str(data["reference_time"])}'
         elif _type == 'observation':
-            self.timeplace = f'{str(data["location"])}{str(10800 * (data["reference_time"]//10800 + 1))}'
+            self.timeplace = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
         else:
             self.timeplace = weather['timeplace']
         self.as_dict = {'timeplace': self.timeplace, \

@@ -7,16 +7,18 @@ from pymongo.database import Database
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
 from pymongo.errors import InvalidDocument, OperationFailure, ConfigurationError
-### no need to have the url encoding anymore
-# from urllib.parse import quote
 
-### removed this line ###
-# database = 'test'
+import config
 
+host = config.host
+port = config.port
+uri = config.uri
 
-def check_db_access(client):
+def check_db_access():
     '''A check that there is write access to the database'''
  
+    client = MongoClient(host, port)
+    
     try:
         client.admin.command('ismaster')
     except ConnectionFailure:
@@ -105,7 +107,7 @@ def dbncol(client, collection, database): ###=database): I don't think this is n
     col = Collection(db, collection)
     return col
 
-def read_to_dict(collection, query={}, limit=None):
+def read_mongo_to_dict(collection, query={}, limit=None):
     ''' Read the colleciton to a dictionary.
 
     :param collection: MongoDB collection
@@ -123,7 +125,7 @@ def read_to_dict(collection, query={}, limit=None):
         cursor = collection.find(query).batch_size(100)
     return {curs.pop('_id'): curs for curs in cursor}
 
-def load(data, client, database, collection):
+def load(data, database, collection):
     ''' Load data to specified database collection. Also checks for a
     preexisting document with the same instant and zipcode, and updates it in
     the case that there was already one there.
@@ -138,6 +140,7 @@ def load(data, client, database, collection):
     :type collection: str
     '''
 
+    client = MongoClient(host, port)
     col = dbncol(client, collection, database)
 
     # set the appropriate database collections, filters and update types
@@ -149,6 +152,7 @@ def load(data, client, database, collection):
             # there is, update it, if there isn't, upsert it.
             return col.find_one_and_update(filters, updates,  upsert=True)
         except DuplicateKeyError:
+            client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
     elif collection == 'observed' \
         or collection == 'forecasted' \
@@ -156,19 +160,23 @@ def load(data, client, database, collection):
         or collection == 'cast_temp':
         try:
             col.insert_one(data)
+            client.close()
             return
         except DuplicateKeyError:
+            client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
     else:
         try:
             filters = {'zipcode':data['zipcode'], 'instant':data['instant']}
             updates = {'$set': {'forecasts': data}} # append to forecasts list
+            client.close()
             return col.find_one_and_update(filters, updates,  upsert=True)
         except DuplicateKeyError:
+            client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
 
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ''' move or copy a collection within and between databases 
+    ''' Move or copy a collection within and between databases.
     
     :param col: the collection to be copied
     :type col: a pymongo collection
@@ -180,23 +188,55 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     By default all collection docs will be copied
     :type filters: dict
     '''
-    temp_client = Client(host=host, port=port)
+	
+	n = 0
+	count = col.count_documents()
     original = col.find(filters).batch_size(100)
     copy = []
-    for item in original:
-        copy.append(item)
-        
-    database = destination_db     # Define database and collection
-    collection = destination_col  # for the following operations.
-    destination = dbncol(temp_client, collection, database)
-    inserted_ids = destination.insert_many(copy).inserted_ids
-    if delete == True:
-        # remove all the inserted documents from the origin collection.
-        for item in inserted_ids.values():
-            filter = {'_id': item}
-            col.delete_one(filter)
-        print(f'MOVED docs from {col} to {destination}.')
-    else:
-        print(f'COPIED docs in {col} to {destination}.')
-    temp_client.close()
+	### Attempting to wrap this in a while-loop to break it up and save my RAM
+	### and swap memories.
+	while original.is_alive():
+		if n+100 <= count:
+			### DO YOU REALLY NEED TO PUT THESE INTO A COPY, OR CAN YOU INSERT
+			### THEM RIGHT OFF THE CURSOR?
+			for item in original[n:n+100]:
+				copy.append(item)
+			n += 100
+        	# Now do everything you need to do to copy the set of documents.
+			database = destination_db     # Define database and collection
+			collection = destination_col  # for the following operations.
+			destination = dbncol(client, collection, database)
+			inserted_ids = destination.insert_many(copy).inserted_ids
+			if delete == True:
+				# remove all the inserted documents from the origin collection.
+				for item in inserted_ids.values():
+					filter = {'_id': item}
+					col.delete_one(filter)
+			### Commented  because I'm waiting for the process to complete
+			### before printing a message to the screen
+# 				print(f'MOVED 100 docs from {col} to {destination}.')
+# 			else:
+# 				print(f'COPIED docs in {col} to {destination}.')
+		else:
+			for item in original[n:]:
+				copy.append(item)
+			# Now do everything you need to do to copy the set of documents.
+			database = destination_db     # Define database and collection
+			collection = destination_col  # for the following operations.
+			destination = dbncol(client, collection, database)
+			inserted_ids = destination.insert_many(copy).inserted_ids
+			if delete == True:
+				# remove all the inserted documents from the origin collection.
+				for item in inserted_ids.values():
+					filter = {'_id': item}
+# 					col.delete_one(filter)
+# 				print(f'MOVED 100 docs from {col} to {destination}.')
+# 			else:
+# 				print(f'COPIED docs in {col} to {destination}.')
+	if delete == True:
+		print(f'MOVED docs from {col} to {destination}.')
+	else:
+		print(f'COPIED docs in {col} to {destination}.')
+    return
+
     
