@@ -3,6 +3,7 @@
 import time
 import json
 
+import geohash
 from benedict import benedict
 from pyowm import OWM
 from pyowm.weatherapi25.forecast import Forecast
@@ -35,8 +36,8 @@ class Weather:
 
         # Create a default weather dict and update it with data.
         weather = {
-            'timeplace': 'DEFAULT',
-            'clouds': 'DEFAULT',
+            'timeplace': str(geohash.encode(location["lon"], location["lat"])) + str(time.time()),
+            'clouds': '0',
             'rain': {'1h': 0,
                     '3h': 0
                     },
@@ -47,22 +48,22 @@ class Weather:
                     'deg': 0,
                      'gust': 0
                     },
-            'humidity': 'DEFAULT',
-            'pressure': {'press': 'DEFAULT',
-                        'sea_level': 'DEFAULT'
+            'humidity': '0',
+            'pressure': {'press': '0',
+                        'sea_level': '0'
                         },
-            'temperature': {'temp': 'DEFAULT',
-                           'temp_max': 'DEFAULT',
-                           'temp_min': 'DEFAULT'
+            'temperature': {'temp': '0',
+                           'temp_max': '0',
+                           'temp_min': '0'
                            },
-            'status': 'DEFAULT',
-            'detailed_status': 'DEFAULT',
-            'weather_code': 'DEFAULT',
+            'status': '0',
+            'detailed_status': '0',
+            'weather_code': '0',
             'visibility_distance': 0,
-            'dewpoint': 'DEFAULT',
-            'humidex': 'DEFAULT',
-            'heat_index': 'DEFAULT',
-            'time_to_instant': 'DEFAULT'
+            'dewpoint': '0',
+            'humidex': '0',
+            'heat_index': '0',
+            'time_to_instant': '0'
         }
         weather = benedict(weather)
         weather.merge(data)
@@ -72,12 +73,21 @@ class Weather:
         self.weather = weather
         # make the "timeplace" for each weather according to its type
         if _type == 'forecast':
-            self.timeplace = f'{str(location)}{str(data["reference_time"])}'
+            self.timeplace = f'\
+            {str(geohash.encode(location["lon"], location["lat"]))}\
+            {str(data["reference_time"])}\
+            '
         elif _type == 'observation':
-            self.timeplace = f'{str(location)}{str(10800 * (data["reference_time"]//10800 + 1))}'
+            self.timeplace = f'\
+            {str(geohash.encode(location["lon"], location["lat"]))}\
+            {str(10800 * (data["reference_time"]//10800 + 1))}\
+            '
         else:
+            
+            ### add to add a look for _id in weather ###
             self.timeplace = weather['timeplace']
-        self.as_dict = {'timeplace': self.timeplace, \
+            self._id = weather['_id']
+        self.as_dict = {'_id': self.timeplace, \
                         '_type': self.type, \
                         'weather': self.weather \
                        }
@@ -197,20 +207,20 @@ def get_current_weather(location):
             coordinates = result['Location']['coordinates']
                         
             # Set the reference_time to the nearest instant.
-            ref_time = min(
-                abs(10800 * (result['Weather']['reference_time']//10800 + 1)
-                    - result['Weather']['reference_time']
-                   ),
-                abs(10800 * (result['Weather']['reference_time']//10800)
-                    - result['Weather']['reference_time']
-                   )
-            )
+            if abs(10800 * (result['Weather']['reference_time']//10800 + 1) - result['Weather']['reference_time']) \
+            <= abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time']):
+                ref_time = abs(10800 * (result['Weather']['reference_time']//10800 + 1) - result['Weather']['reference_time'])
+            else:
+                ref_time = abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time'])
 
-            timeplace = str(coordinates) + str(ref_time)
-            result['Weather']['location'] = coordinates
-            result['Weather']['timeplace'] = timeplace
-            result['time_to_instant'] = result['Weather']['reference_time'] \
-                                    - result['reception_time']            
+            timeplace = str(geohash.encode(location["lon"], location["lat"])) + str(ref_time)
+            print(timeplace)
+
+            ### changing the timeplace from stringcast geocoord dict ###
+            ### changing the timeplace from stringcast geocoord dict ###
+#             result['Weather']['location'] = coordinates
+            result['Weather']['_id'] = timeplace
+            result['Weather']['time_to_instant'] = ref_time - result['reception_time']            
             weather = Weather(coordinates, 'observation', result['Weather'])
 
             return weather
@@ -241,7 +251,7 @@ def five_day(location):
     for data in forecast['weathers']:
         # Make an timeplace for the next Weather to be created, create the
         # Weather, append it to the casts list.
-        data['timeplace'] = str(location) + str(data['reference_time'])
+        data['_id'] = str(geohash.encode(location["lon"], location["lat"])) + str(data['reference_time'])
         data['time_to_instant'] = data['reference_time'] \
                                 - forecast['reception_time']
         casts.append(Weather(location, 'forecast', data))
