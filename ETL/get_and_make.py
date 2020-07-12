@@ -57,9 +57,17 @@ def get_and_make(codes):
         # Try to load the data in the weather.Weather objects. If it can't, do
         # load it the old way in case current and forecasts are dict and list.
         try:
-            db_ops.load(current.as_dict, config.database, 'obs_temp')
+            db_ops.load(
+                current.as_dict,
+                config.database,
+                config.observation_collection
+            )
             for cast in forecasts:
-                db_ops.load(cast.as_dict, config.database, 'cast_temp')
+                db_ops.load(
+                    cast.as_dict,
+                    config.database,
+                    config.forecast_collection
+                )
         except:
             print(f'''There was an error while get_and_make.get_and_make() was
             attempting to load to {client}. Now trying to use request_and_load.
