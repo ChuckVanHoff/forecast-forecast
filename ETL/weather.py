@@ -36,7 +36,8 @@ class Weather:
 
         # Create a default weather dict and update it with data.
         weather = {
-            'timeplace': str(geohash.encode(location["lon"], location["lat"])) + str(time.time()),
+            '_id': str(geohash.encode(location["lon"], location["lat"]))\
+                + str(int(time.time())),
             'clouds': '0',
             'rain': {'1h': 0,
                     '3h': 0
@@ -71,17 +72,11 @@ class Weather:
         self.type = _type
         self.loc = location
         self.weather = weather
-        # make the "timeplace" for each weather according to its type
+       # make the "timeplace" for each weather according to its type
         if _type == 'forecast':
-            self.timeplace = f'\
-            {str(geohash.encode(location["lon"], location["lat"]))}\
-            {str(data["reference_time"])}\
-            '
+            self.timeplace = f'{str(geohash.encode(location["lon"], location["lat"]))}{str(data["reference_time"])}'
         elif _type == 'observation':
-            self.timeplace = f'\
-            {str(geohash.encode(location["lon"], location["lat"]))}\
-            {str(10800 * (data["reference_time"]//10800 + 1))}\
-            '
+            self.timeplace = f'{str(geohash.encode(location["lon"], location["lat"]))}{str(10800 * (data["reference_time"]//10800 + 1))}'
         else:
             
             ### add to add a look for _id in weather ###
@@ -207,22 +202,23 @@ def get_current_weather(location):
             coordinates = result['Location']['coordinates']
                         
             # Set the reference_time to the nearest instant.
-            if abs(10800 * (result['Weather']['reference_time']//10800 + 1) - result['Weather']['reference_time']) \
-            <= abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time']):
-                ref_time = abs(10800 * (result['Weather']['reference_time']//10800 + 1) - result['Weather']['reference_time'])
+            time_to_next = abs(10800 * (result['Weather']['reference_time']//10800 + 1) - result['Weather']['reference_time'])
+            time_to_previous = abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time'])
+            if time_to_next <= time_to_previous:
+                ref_time = 10800 * (result['Weather']['reference_time']//10800 + 1)
             else:
-                ref_time = abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time'])
-
-            timeplace = str(geohash.encode(location["lon"], location["lat"])) + str(ref_time)
-            print(timeplace)
-
-            ### changing the timeplace from stringcast geocoord dict ###
-            ### changing the timeplace from stringcast geocoord dict ###
-#             result['Weather']['location'] = coordinates
+                ref_time = 10800 * (result['Weather']['reference_time']//10800)
+            
+            hash_string = str(geohash.encode(location["lon"], location["lat"]))
+            # print(hash_string, ref_time)
+            timeplace = hash_string + str(ref_time)
+            # print(timeplace)
+            # print(result)
+            # exit()
+            
             result['Weather']['_id'] = timeplace
             result['Weather']['time_to_instant'] = ref_time - result['reception_time']            
             weather = Weather(coordinates, 'observation', result['Weather'])
-
             return weather
         except APICallTimeoutError:
             # Reset the API object

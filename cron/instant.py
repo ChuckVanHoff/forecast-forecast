@@ -36,7 +36,6 @@ class Instant:
         :return: Boolian value (True or False)
         '''
         
-#         self.count()
         if self.count == 40:
             return True
         else:
@@ -63,7 +62,6 @@ class Instant:
 
 
 def convert(instants):
-    ### THIS FUNCTION IS UNPROVEN ###
     ''' Convert a list of instants to instant.Instant objects.
     
     :param instants: the instants
@@ -84,7 +82,7 @@ def convert(instants):
     converted = {}
     try:
         if isinstance(instants, dict):
-            print('converting a dict')
+            # print('instant.convert() working on a dict')
             for key, value in instants.items():
                 if 'observation' in value:
                     converted[key] = Instant(
@@ -105,8 +103,8 @@ def convert(instants):
                     )
             return converted
         elif isinstance(instants, pymongo.collection.Collection):
-            print('converting a collection:')
-            for doc in instants.find({}):
+            # print('instant.convert() working on a pymongo.collection.Collection')
+            for doc in instants.find({}).batch_size(100):
                 if 'observation' in doc:
                     if 'forecasts' in doc:
                         converted[doc['_id']] = Instant(
@@ -130,8 +128,8 @@ def convert(instants):
                 else:
                     continue
             return converted
-        elif type(instants) == pymongo.cursor.CursorType:
-            print('converting a cursor')
+        elif type(instants) == pymongo.cursor.Cursor:
+            # print('instant.convert() working on a pymongo.cursor.Cursor')
             for doc in instants:
                 if 'observation' in doc:
                     if 'forecasts' in doc:
@@ -140,12 +138,12 @@ def convert(instants):
                             doc['forecasts'],
                             doc['observation']
                         )
-                elif  'observations' in doc:
+                elif 'observations' in doc:
                     if 'forecasts' in doc:
                         converted[doc['_id']] = Instant(
                             doc['_id'],
                             doc['forecasts'],
-                            doc['observation']
+                            doc['observations']
                         )
                 elif 'observations' not in doc and 'observation' not in doc:
                     if 'forecasts' in doc:
@@ -157,7 +155,8 @@ def convert(instants):
                     continue
             return converted
     except KeyError as e:
-        print(f'KeyError {e}')
+        print(f'KeyError in instant.convert(): {e}')
+        
         return converted
         
 def cast_count_all(instants):
@@ -187,7 +186,6 @@ def cast_count_all(instants):
 
 
 def sweep(instants):
-    ### THIS FUNCTION IS DOING NOTHING IF IT REFERS TO ANY 'instant' KEY ###
     ''' Move any instant that has a ref_time less than the current next
     ref_time and with self.count less than 40. This is getting rid of the
     instants that are not and will not ever be legit.
@@ -199,17 +197,20 @@ def sweep(instants):
     import time
     
     import pymongo
-    from pymongo import MongoClient
     from pymongo.cursor import Cursor
+
     import config
     import db_ops
     
-    client = MongoClient(config.host, config.port)
-    col = db_ops.dbncol(client, config.instants_collection, config.database)
+    col = db_ops.dbncol(
+        config.client,
+        config.instants_collection,
+        config.database
+    )
     n = 0
     # Check the instant type- it could be a dict if it came from the database,
     # or it could be a list if it's a bunch of instant objects, or a pymongo
-    # cursor over the database.
+    # cursor on the collection.
     if type(instants) == dict:
         for key, doc in instants.items():
             if key['instant'] < time.time()-453000:  # 453000sec: about 5 days
@@ -221,8 +222,50 @@ def sweep(instants):
                 col.delete_one(doc)
                 n += 1
     elif type(instants) == pymongo.cursor.Cursor:
-        for doc in instants:
-            if doc['instant'] < time.time()-453000:
+        key = str
+        for doc in instants:                
+        
+        ### This can probably be deleted if all the past collected data has
+        ### been processed.
+        # Check for the different likely keys in the documents and set the key
+        # to the key that is there. for doc in instants:
+            if 'instant' in doc:
+                key = 'instant'
+                instant = int(doc['instant'])
+            elif 'observation' in doc:
+                doc['observations'] = doc['observation']
+                kee = 'observations'
+                if 'timeplace' in doc:
+                    instant = int(doc[kee]['weather']['timeplace'][:-10:-1])
+                if '_id' in doc:
+                    # print(doc['_id'])
+                    instant = int(doc['_id'][:-10:-1])
+            elif 'observations' in doc:
+                kee = 'observations'
+                if 'timeplace' in doc:
+                    instant = int(doc[kee]['weather']['timeplace'][:-10:-1])
+                if '_id' in doc:
+                    val = doc[kee]['weather']['_id'][:-10:-1]
+                    instant = int(val)                
+            elif 'forecasts' in doc:
+                kee = 'forecasts'
+                for d in doc[kee]:
+                    if 'timeplace' in d:
+                        instant = int(d['timeplace'][:-10:-1])
+                    if '_id' in d:
+                        instant = int(d['_id'][:-10:-1])
+            elif 'errors' in doc:
+                return
+            else:
+                print('This document cannot be processed by sweep(). It does \
+                not have these keys: instant, observation, observations, \
+                forecasts')
+                print(f'From {col}', '\n', doc)
+                return
+        ### This can probably be deleted if all the past collected data has
+        ### been processed and just leave the following if statement.
+        
+            if instant < time.time()-453000:
                 col.delete_one(doc)
                 n += 1
     else:
@@ -236,18 +279,16 @@ def find_legit(instants, and_load=True):
      :type instants: dict of dicts
      :return: list of instants with a complete forecasts array
      '''
-    ### ADD FUNCTIONALITY TO ALLOW PROCESSING OF DICT, LIST, CURSOR, COL ###
+    
     inst = convert(instants) # Convert the values of instants to Instants
     del instants
-    
-    print(type(inst))
     # Make a load list out of the Instants
     if and_load:
         legit_load_list = []
         for key, value in inst.items():
             if value.itslegit:
                 legit_load_list.append(update_command_for(value.as_dict))
-        print(f'Got the legit_load_list and it is this long: {len(legit_load_list)}')
+#         print(f'Got the legit_load_list and it is this long: {len(legit_load_list)}')
         if len(legit_load_list) != 0:
             load_legit(legit_load_list)
         del legit_load_list
@@ -269,35 +310,34 @@ def load_legit(legit):
     :type legit: dict or list
     '''
 
-    from pymongo import MongoClient
-    from pymongo.errors import DuplicateKeyError, InvalidOperation
-
     import config
     import db_ops
     
-    client = MongoClient(config.host, config.port)
-    remote_col = db_ops.dbncol(db_ops.Client(config.uri),
-                               'legit_inst',
-                               config.database
-                              )
-    col = db_ops.dbncol(client,
-                        config.instants_collection,
-                        config.database
-                       )
+    # make the remote and local clients from the config file for dbncol()
+    remote_col = db_ops.dbncol(
+        config.remote_client,
+        config.legit_instants,
+        config.database)
+    col = db_ops.dbncol(
+        config.client,
+        config.instants_collection,
+        config.database)
+
     if not isinstance(legit, dict):
         try:
             remote_col.bulk_write(legit)
-        except InvalidOperation as e:
+        except pymongo.errors.InvalidOperation as e:
             print(e)
-            client.close()
+            return -1
+        except TypeError as e:
+            print(e)
             return -1
     else:
         try:
             remote_col.insert_one(legit)
             print(f'from {type(legit)}, loaded legit')
-        except DuplicateKeyError:
+        except pymongo.errors.DuplicateKeyError:
             col.delete_one(legit)
-    client.close()
     return
 
 
@@ -310,14 +350,52 @@ if __name__ == '__main__':
     
     import config
     import db_ops
+    from make_instants import update_command_for
 
     start_time = time.time() # This is to get the total runtime if this script is
                              # run as __main__
     print('Database sweep in progress...')
-    collection = config.instants_collection
-    col = db_ops.dbncol(db_ops.Client(config.uri),
-                        config.instants_collection,
-                        config.database)
-    find_legit(collection, and_load=True)
-    sweep(col.find({}).batch_size(100))
+    collection = db_ops.dbncol(   # The local collection
+        config.client,
+        config.instants_collection,
+        config.database
+    )
+    col = db_ops.dbncol(   # The remote collection
+        config.remote_client,
+        config.legit_instants,
+        config.database
+    )
+
+    ### Add the different filters that might help get all the differnt docs
+    Filters = [
+        {'instant': {'$exists': True}},
+        {'_id': {'$exists': True}},
+        {'observations': {'$exists': True}},
+        {'observation': {'$exists': True}},
+        {'forecasts': {'$exists': True}},
+        {'timeplace': {'$exists': True}}
+    ]
+    for filters in Filters:
+        # print(f'Looping with {filters}')
+        # col_count = collection.count_documents({})
+        col_count = collection.count_documents(filters)
+        if col_count == 0:
+            continue
+        n = 0
+        while n <= col_count:
+            if n%10000 == 0:
+                print(f'working..... n={n}')
+            # find_legit(collection.find({})[n:n+100], and_load=True)  
+            find_legit(collection.find(filters)[n:n+100], and_load=True)  
+            n += 100
+        try:
+            # find_legit(collection.find({})[:n], and_load=True)
+            find_legit(collection.find(filters)[:n], and_load=True)
+        except:
+            print('there was some exception')
+        sweep(collection.find(filters).batch_size(100))
+    ### Add the different filters that might help get all the differnt docs
+
+    sweep(collection.find({}).batch_size(100))
+
     print(f'Total sweep time was {time.time()-start_time} seconds')

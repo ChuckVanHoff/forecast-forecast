@@ -51,35 +51,64 @@ def update_command_for(data):
     :param data: the data dictionary created from the api calls
     :type data: dict
     :return: the command that will be used to find and update documents
-    ''' 
+    '''
     
+    ### ORIGINAL ###
+#     if data['_type'] == 'forecast':
+#         filters = {'_id': data['timeplace']}
+#         updates = {'$push': {'forecasts': data}} # append to forecasts list
+#         return pymongo.UpdateOne(filters, updates,  upsert=True)
+#     elif data['_type'] == 'observation':
+#         filters = {'_id': data['timeplace']}
+#         updates = {'$set': {'observation': data}}
+#         return pymongo.UpdateOne(filters, updates,  upsert=True)
+#     else:
+#         filters = {'_id': 'update_command_for(data)error'}
+#         updates = {'$set': {'errors': data}}
+#         return pymongo.UpdateOne(filters, updates,  upsert=True)
+    ### ORIGINAL ###
+    
+    ### wrap this in a try-except to get past KeyErrors. TEMP FIX FOR FINDING
+    ### LEGITS IN OLD DATA
     try:
-		if data['_type'] == 'forecast':
-			filters = {'_id': data['timeplace']}
-			updates = {'$push': {'forecasts': data}} # append to forecasts list
-			return pymongo.UpdateOne(filters, updates,  upsert=True)
-		elif data['_type'] == 'observation':
-			filters = {'_id': data['timeplace']}
-			updates = {'$set': {'observation': data}}
-			return pymongo.UpdateOne(filters, updates,  upsert=True)
-		else:
-			filters = {'_id': 'update_command_for(data)error'}
-			updates = {'$set': {'errors': data}}
-	        return pymongo.UpdateOne(filters, updates,  upsert=True)
-	except:
-		if data['_type'] == 'forecast':
-			filters = {'timeplace': data['timeplace']}
-			updates = {'$push': {'forecasts': data}} # append to forecasts list
-			return pymongo.UpdateOne(filters, updates,  upsert=True)
-		elif data['_type'] == 'observation':
-			filters = {'timeplace': data['timeplace']}
-			updates = {'$set': {'observations': data}}
-			return pymongo.UpdateOne(filters, updates,  upsert=True)
-		else:
-			filters = {'timeplace': data['timeplace']}
-			updates = {'$set': data}
-			print('made load command for an instant')
-	        return pymongo.UpdateOne(filters, updates,  upsert=True)
+        if '_type' in data:
+            if data['_type'] == 'forecast':
+                updates = {'$push': {'forecasts': data}} # append to forecasts list
+            elif data['_type'] == 'observation':
+                updates = {'$set': {'observation': data}}
+            if 'timeplace' in data:
+                filters = {'_id': data['timeplace']}
+            if '_id' in data:
+                filters = {'_id': data['_id']}
+            return pymongo.UpdateOne(filters, updates,  upsert=True)
+        elif 'forecasts' in data or 'observations' in data or 'observation' in data:
+
+            ### change the key name from observaTION to observaTIONS ###
+            if 'observation' in data:
+                data['observations'] = data.pop('observation')
+            ### change the key name from observaTION to observaTIONS ###
+
+            ### I am not sure if there will be '_id' or 'timeplace' in the data
+            ### coming in from the function argument.
+#             filters = {'_id': data['_id']}
+                try:
+                    filters = {'_id': data['_id']}
+                except KeyError as e:
+                    print(f'KeyError: {e}. Attempt setting filter using timeplace')
+                    filters = {'_id': data['timeplace']}
+            ### I am not sure if there will be '_id' or 'timeplace' in the data
+            ### coming in from the function argument.
+
+            return pymongo.InsertOne(data)
+    except KeyError as e:
+        print(f'Had a KeyError for {e} while attempting update_command_for(). \
+        In case you are curious, these are the keys that are in the data: \
+        {data.keys()}')
+        updates = {'$set': {'errors': data}}
+        filters = {'_id': 'update_command_for(data)error'}
+        return pymongo.UpdateOne(filters, updates,  upsert=True)
+    ### wrap this in a try-except to get past KeyErrors. TEMP FIX FOR FINDING
+    ### LEGITS IN OLD DATA
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -135,7 +164,7 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
         print(e)
     return
 
-def make_instants():
+def make_instants(client, cast_col, obs_col, inst_col):
     ''' Make the instant documents, as many as you can, with the data in the
     named database.
     
@@ -146,14 +175,18 @@ def make_instants():
     :param client: a MongoDB client
     :type client: pymongo.MongoClient
     '''
+    
+    #Get the data
+    cast_col = db_ops.dbncol(client, cast_col, config.database)
+    obs_col = db_ops.dbncol(client, obs_col, config.database)
+    inst_col = db_ops.dbncol(client, inst_col, config.database)
 
-    client = MongoClient(host, port)
-    # Get the data.
-    cast_col = db_ops.dbncol(client, "cast_temp", config.database)
-    obs_col = db_ops.dbncol(client, "obs_temp", config.database)
-    inst_col = db_ops.dbncol(client, "instant_temp", config.database)
+    ### ADD THESE .batch_size() METHODS TO THE CURSORS ###
+#     forecasts = cast_col.find({})
+#     observations = obs_col.find({})
     forecasts = cast_col.find({}).batch_size(100)
     observations = obs_col.find({}).batch_size(100)
+    ### ADD THESE .batch_size() METHODS TO THE CURSORS ###
     
     inst_col.create_index([('timeplace', pymongo.DESCENDING)])
     

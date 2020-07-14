@@ -79,7 +79,7 @@ def Client(uri):
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database):
+def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -125,7 +125,7 @@ def read_mongo_to_dict(collection, query={}, limit=None):
         cursor = collection.find(query).batch_size(100)
     return {curs.pop('_id'): curs for curs in cursor}
 
-def load(data, client, database, collection):
+def load(data, database, collection):
     ''' Load data to specified database collection. Also checks for a
     preexisting document with the same instant and zipcode, and updates it in
     the case that there was already one there.
@@ -157,7 +157,10 @@ def load(data, client, database, collection):
     elif collection == 'observed' \
         or collection == 'forecasted' \
         or collection == 'obs_temp' \
-        or collection == 'cast_temp':
+        or collection == 'cast_temp' \
+        or collection == config.observation_collection \
+        or collection == config.forecast_collection \
+        or collection == config.instants_collection:
         try:
             col.insert_one(data)
             client.close()
@@ -175,8 +178,50 @@ def load(data, client, database, collection):
             client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
 
+### I know that I am not using this function, but I made a few edits in the 
+### case that I do need to use it at some time. See below in the un-commented.
+# def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
+#     ''' Move or copy a collection within and between databases 
+    
+#     :param col: the collection to be copied
+#     :type col: a pymongo collection
+#     :param destination_col: the collection you want the documents copied into
+#     :type destination_col: a pymongo.collection.Collection object
+#     :param destination_db: the database you want the documents copied into
+#     :type destination_db: a pymongo database pymongo.database.Database
+#     :param filters: a filter for the documents to be copied from the collection
+#     By default all collection docs will be copied
+#     :type filters: dict
+#     '''
+
+#     temp_client = MongoClient(host, port)  # temp_client for the destination db
+#     original = col.find(filters).batch_size(100)
+#     copy = []
+#     for item in original:
+#         copy.append(item)
+        
+#     database = destination_db     # Define database and collection
+#     collection = destination_col  # for the following operations.
+#     destination = dbncol(temp_client, collection, database)
+#     inserted_ids = destination.insert_many(copy).inserted_ids
+#     try:
+#         inserted_ids = destination.insert_many(copy).inserted_ids
+#         if delete == True:
+#             # remove all the documents from the original collection
+#             for row in inserted_ids:
+#                 filters = {'_id': row}
+#                 gotit = col.delete_one(filters)
+#                 if not gotit:
+#                     print(f'db_ops.copy_docs....did not delete {row} from {col}.')
+#         else:
+#             client.close()
+#             print(f'COPIED docs in {col} to {destination}.')
+#     except pymongo.errors.BulkWriteError as e:
+#         print(f'The documents have not been copied to {destination_col}.')
+#         print(e)
+#     return
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ''' Move or copy a collection within and between databases 
+    ''' Move or copy a collection within and between databases.
     
     :param col: the collection to be copied
     :type col: a pymongo collection
@@ -188,31 +233,50 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     By default all collection docs will be copied
     :type filters: dict
     '''
-
-    temp_client = MongoClient(host, port)  # temp_client for the destination db
+    
+    n = 0
+    count = col.count_documents()
     original = col.find(filters).batch_size(100)
     copy = []
-    for item in original:
-        copy.append(item)
-        
-    database = destination_db     # Define database and collection
-    collection = destination_col  # for the following operations.
-    destination = dbncol(temp_client, collection, database)
-    inserted_ids = destination.insert_many(copy).inserted_ids
-    try:
-        inserted_ids = destination.insert_many(copy).inserted_ids
-        if delete == True:
-            # remove all the documents from the original collection
-            for row in inserted_ids:
-                filters = {'_id': row}
-                gotit = col.delete_one(filters)
-                if not gotit:
-                    print(f'db_ops.copy_docs....did not delete {row} from {col}.')
+    ### Attempting to wrap this in a while-loop to break it up and save my RAM
+    ### and swap memories.
+    while original.is_alive():
+        if n+100 <= count:
+            ### DO YOU REALLY NEED TO PUT THESE INTO A COPY, OR CAN YOU INSERT
+            ### THEM RIGHT OFF THE CURSOR?
+            for item in original[n:n+100]:
+                copy.append(item)
+            n += 100
+            # Now do everything you need to do to copy the set of documents.
+            database = destination_db     # Define database and collection
+            collection = destination_col  # for the following operations.
+            destination = dbncol(client, collection, database)
+            inserted_ids = destination.insert_many(copy).inserted_ids
+            if delete == True:
+                # remove all the inserted documents from the origin collection.
+                for item in inserted_ids.values():
+                    filter = {'_id': item}
+                    col.delete_one(filter)
         else:
-            client.close()
-            print(f'COPIED docs in {col} to {destination}.')
-    except pymongo.errors.BulkWriteError as e:
-        print(f'The documents have not been copied to {destination_col}.')
-        print(e)
+            for item in original[n:]:
+                copy.append(item)
+            # Now do everything you need to do to copy the set of documents.
+            database = destination_db     # Define database and collection
+            collection = destination_col  # for the following operations.
+            destination = dbncol(client, collection, database)
+            inserted_ids = destination.insert_many(copy).inserted_ids
+            if delete == True:
+                # remove all the inserted documents from the origin collection.
+                for item in inserted_ids.values():
+                    filter = {'_id': item}
+                    col.delete_one(filter)
+# 				print(f'MOVED 100 docs from {col} to {destination}.')
+# 			else:
+# 				print(f'COPIED docs in {col} to {destination}.')
+    if delete == True:
+        print(f'MOVED docs from {col} to {destination}.')
+    else:
+        print(f'COPIED docs in {col} to {destination}.')
     return
-    
+### I know that I am not using this function, but I made a few edits in the 
+### case that I do need to use it at some time. See above in the un-commented.

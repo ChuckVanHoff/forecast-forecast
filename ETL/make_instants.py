@@ -76,7 +76,10 @@ def update_command_for(data):
                 updates = {'$push': {'forecasts': data}} # append to forecasts list
             elif data['_type'] == 'observation':
                 updates = {'$set': {'observation': data}}
-            filters = {'_id': data['timeplace']}
+            if 'timeplace' in data:
+                filters = {'_id': data['timeplace']}
+            if '_id' in data:
+                filters = {'_id': data['_id']}
             return pymongo.UpdateOne(filters, updates,  upsert=True)
         elif 'forecasts' in data or 'observations' in data or 'observation' in data:
 

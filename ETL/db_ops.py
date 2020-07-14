@@ -157,7 +157,10 @@ def load(data, database, collection):
     elif collection == 'observed' \
         or collection == 'forecasted' \
         or collection == 'obs_temp' \
-        or collection == 'cast_temp':
+        or collection == 'cast_temp' \
+        or collection == config.observation_collection \
+        or collection == config.forecast_collection \
+        or collection == config.instants_collection:
         try:
             col.insert_one(data)
             client.close()
