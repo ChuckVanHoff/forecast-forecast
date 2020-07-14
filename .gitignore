@@ -72,6 +72,10 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+ioveralls.ipynb
+geohash.ipynb
+use_inst.ipynb
+d_frame.ipynb
 
 # pyenv
 .python-version

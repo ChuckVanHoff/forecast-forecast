@@ -1,14 +1,21 @@
-''' Defines the Instant class and some useful functions. '''
+''' Defines the Instant class and some useful functions. When executed as main
+this module will search the database for completed and incompletable Instants
+and move the completed to a remote database-collection, legit_inst, and delete
+all the incompletable instants.'''
 
 
 class Instant:
+    ''' The Instant is an object built out of a collection of Weathers: in the
+    case of forecast-forecast there are 40 forecast dictionaries contained in a
+    list and one observation dictionary for comparison.
+    '''
 
-    def __init__(self, _id, forecasts=[], observations={}):
+    def __init__(self, timeplace, forecasts=[], observations={}):
         
-        self._id = _id
+        self.timeplace = timeplace
         self.casts = forecasts
         self.obs = observations
-        self.as_dict = {'_id': self._id,
+        self.as_dict = {'timeplace': self.timeplace,
                         'forecasts': self.casts,
                         'observations': self.obs
                         }
@@ -21,14 +28,14 @@ class Instant:
     
     @property
     def itslegit(self):
-        ''' Check the instant's weathers array's count and if it is 40, then the
-        document is returned.
+        ''' Check the instant's weathers array's count and if it is 40, then
+        True is returned, otherwise it returns False.
 
         :param instant: the instant docuemnt to be legitimized
         :type instant: dictionary
+        :return: Boolian value (True or False)
         '''
         
-        self.count()
         if self.count == 40:
             return True
         else:
@@ -41,27 +48,117 @@ class Instant:
         :type collection: string
         '''
 
-        from config import database
-        from db_ops import dbncol
+        import config
+        import db_ops
+        
+        col = db_ops.dbncol(client, collection, config.database)
+        
+        if self.itslegit:
+            col.update_one({'timeplace': self.timeplace},
+                           {'$set': self.as_dict},
+                           upsert=True
+                          )
+        return
 
-        col = dbncol(client, collection, database=database)
-        col.update_one({'_id': self._id}, {'$set': self.as_dict}, upsert=True)
-        
-    def as_delta(self):
-        ''' Create an Instant delta object. It finds the delta between the 
-        observation and each forecast and returns a list of deltas. '''
-        
-        from delta import make_delta
-        
-        # Loop through the forecasts array and append the return of make_delta()
-        # to and deltas list before returning that list.
-        return [make_delta(cast, self.obs) for cast in self.casts]
 
+def convert(instants):
+    ''' Convert a list of instants to instant.Instant objects.
     
+    :param instants: the instants
+    :type instants: This function is able to handle multiple types-
+        dict: must be a dict of dicts and sets the instant timeplace to
+            whatever the primary keys are.
+        pymongo.collection.Collection: the collection will be converted to a
+            cursor. It must have the same data fields that the dictionary must.
+        pymongo.cursor.CursorType: A cursor over a collection query result.
+            It has to have the same data that the dict has to have.
+            
+    :return: dict of instant.Instant objects
+    '''
+    
+    import pymongo
+    from pymongo.cursor import CursorType
+    
+    converted = {}
+    try:
+        if isinstance(instants, dict):
+            for key, value in instants.items():
+                if 'observation' in value:
+                    converted[key] = Instant(
+                        key,
+                        value['forecasts'],
+                        value['observation']
+                    )
+                elif 'observations' in value:
+                    converted[key] = Instant(
+                        key,
+                        value['forecasts'],
+                        value['observations']
+                    )
+                else:
+                    converted[key] = Instant(
+                        key,
+                        value['forecasts']
+                    )
+            return converted
+        elif isinstance(instants, pymongo.collection.Collection):
+            for doc in instants.find({}).batch_size(100):
+                if 'observation' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif  'observations' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif 'observations' not in doc and 'observation' not in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts']
+                        )
+                else:
+                    continue
+            return converted
+        elif type(instants) == pymongo.cursor.Cursor:
+            for doc in instants:
+                if 'observation' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif  'observations' in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts'],
+                            doc['observation']
+                        )
+                elif 'observations' not in doc and 'observation' not in doc:
+                    if 'forecasts' in doc:
+                        converted[doc['_id']] = Instant(
+                            doc['_id'],
+                            doc['forecasts']
+                        )
+                else:
+                    continue
+            return converted
+    except KeyError as e:
+        print(f'KeyError {e}')
+        return converted
+        
 def cast_count_all(instants):
     ''' get a tally for the forecast counts per document 
 
-    :param instants: docmuments loaded from the db.instants collection ### NOT
+    :param instants: docmuments loaded from the db.instants collection
     Instant class objects
     :type instants: list
     '''
@@ -72,10 +169,11 @@ def cast_count_all(instants):
     # Go through each doc in the collection and count the number of items in
     # the forecasts array. Add to the tally for that count.
     for doc in instants:
-        n = len(doc['forecasts'])
-        # Move the legit instants to the permenant database
-        if n >= 40:
-            load_legit(doc)
+        if 'forecasts' in doc:
+            n = len(doc['forecasts'])
+        else:
+            print('doc did not have forecasts as a key.')
+            continue
         if n in collection_cast_counts:
             collection_cast_counts[n] += 1
         else:
@@ -86,26 +184,31 @@ def cast_count_all(instants):
 def sweep(instants):
     ''' Move any instant that has a ref_time less than the current next
     ref_time and with self.count less than 40. This is getting rid of the
-    instnats that are not and will never be legit. 
+    instants that are not and will not ever be legit.
 
-    :param instants: a list of Instant objects
+    :param instants: a itterable of Instant objects
+    :type instants: dict, list, pymongo cursor
     '''
     
     import time
     
     import pymongo
     from pymongo.cursor import Cursor
-    from Extract.make_instants import find_data
-    from config import client, database
-    from db_ops import dbncol
+
+    import config
+    import db_ops
     
-    col = dbncol(client, 'instant_temp', database=database)
+    col = db_ops.dbncol(
+        config.client,
+        config.instants_collection,
+        config.database
+    )
     n = 0
     # Check the instant type- it could be a dict if it came from the database,
     # or it could be a list if it's a bunch of instant objects, or a pymongo
-    # cursor over the database.
+    # cursor on the collection.
     if type(instants) == dict:
-        for key, doc in instants:
+        for key, doc in instants.items():
             if key['instant'] < time.time()-453000:  # 453000sec: about 5 days
                 col.delete_one(doc)
                 n += 1
@@ -115,135 +218,148 @@ def sweep(instants):
                 col.delete_one(doc)
                 n += 1
     elif type(instants) == pymongo.cursor.Cursor:
-        for doc in instants:
-            if doc['instant'] < time.time()-453000:
+        key = str
+        for doc in instants:                
+        
+        ### This can probably be deleted if all the past collected data has
+        ### been processed.
+        # Check for the different likely keys in the documents and set the key
+        # to the key that is there. for doc in instants:
+            if 'instant' in doc:
+                key = 'instant'
+                instant = int(doc['instant'])
+            elif 'observation' in doc:
+                doc['observations'] = doc['observation']
+                kee = 'observations'
+                instant = int(doc[kee]['timeplace'][:-10:-1])
+            elif 'observations' in doc:
+                kee = 'observations'
+                instant = int(doc[kee]['timeplace'][:-10:-1])
+                
+            elif 'forecasts' in doc:
+                kee = 'forecasts'
+                instant = int(doc['_id'][:-10:-1])
+            elif 'errors' in doc:
+                return
+            else:
+                print('This document cannot be processed by sweep(). It does \
+                not have these keys: instant, observation, observations, \
+                forecasts')
+                print(f'From {col}', '\n', doc)
+                return
+        ### This can probably be deleted if all the past collected data has
+        ### been processed and just leave the following if statement.
+        
+            if instant < time.time()-453000:
                 col.delete_one(doc)
                 n += 1
     else:
         print(f'You want me to sweep instants that are {type(instants)}\'s.')
     return
 
-def find_legit(instants):
-    ### THIS DOES NOT WORK ###
+def find_legit(instants, and_load=True):
     ''' find the 'legit' instants within the list
 
      :param instants: all the instants pulled from the database
-     :type instants: list
+     :type instants: dict of dicts
      :return: list of instants with a complete forecasts array
      '''
+    
+    inst = convert(instants) # Convert the values of instants to Instants
+    del instants
+    # Make a load list out of the Instants
+    if and_load:
+        legit_load_list = []
+        for key, value in inst.items():
+            if value.itslegit:
+                legit_load_list.append(update_command_for(value.as_dict))
+#         print(f'Got the legit_load_list and it is this long: {len(legit_load_list)}')
+        if len(legit_load_list) != 0:
+            load_legit(legit_load_list)
+        del legit_load_list
 
-    i = [item for item in instants if len(item['forecasts']) >= 40]
-    return f'legit list is {len(i)} items long'
-    ### maybe you should make the instant documents pulled form the database
-    ### represented as Instants in memory. Then you could use the Instant
-    ### methods you've been writing.
+    # Make a lisf of legit instants and return it.
+    legit_dict = {}
+    for key, value in inst.items():
+        if value.itslegit:
+            legit_dict[value.timeplace] = value.as_dict
+    return legit_dict
 
-
-def load_legit(legit_list):
+def load_legit(legit):
     ''' Load the 'legit' instants to the remote database and delete from temp.
-    This process does not delete the 
+    This process does not delete the documents upon insertion, but rather holds
+    it until the next time, tries to load it then, and finally, when getting a
+    duplicate key error, deletes the document from its temporary location.
 
-    :param collection: the collection you want to pull instants from
-    :type collection: pymongo.collection.Collection
+    :param legit: a single document or a list of update commands
+    :type legit: dict or list
     '''
 
-    from pymongo.errors import DuplicateKeyError
-    from config import client, database
-    from db_ops import dbncol
-    from db_ops import copy_docs
+    import config
+    import db_ops
     
-### this should load to legit_inst in owmap for production ###
-#         col = dbncol(client, 'legit_inst', 'owmap')
-    col = dbncol(client, 'legit_inst', database=database)
-    try:
-        col.insert_one(legit_list)
-    except DuplicateKeyError:
-        col = dbncol(client, 'instant_temp', database=database)
-        col.delete_one(legit_list)
-        ### saved for later, when doing it on bulk ###
-#     col.insert_many(legit_list)
-    # Now go to the temp_instants collection and delete the instants just
-    # loaded to legit_inst.
-#     col.delete_many(legit_list)
+    # make the remote and local clients from the config file for dbncol()
+    remote_col = db_ops.dbncol(
+        config.remote_client,
+        config.legit_instants,
+        config.database)
+    col = db_ops.dbncol(
+        config.client,
+        config.instants_collection,
+        config.database)
+
+    if not isinstance(legit, dict):
+        try:
+            remote_col.bulk_write(legit)
+        except pymongo.errors.InvalidOperation as e:
+            print(e)
+            return -1
+        except TypeError as e:
+            print(e)
+            return -1
+    else:
+        try:
+            remote_col.insert_one(legit)
+            print(f'from {type(legit)}, loaded legit')
+        except pymongo.errors.DuplicateKeyError:
+            col.delete_one(legit)
     return
 
-def make_delta(cast, obs):
-    ''' Compare the values of two dicts, key by key. When the values are numbers
-    return the difference, when strings return 0 if the strings are equal and 1
-    if they are different, when dicts run this function, when NoneType set the
-    value to 99999.
-    
-    :params cast, obs: dictionaries with the same set of keys and sub-keys
-    :type cas, obs: dict
-    '''
-    
-    delta = {}  # The delta document. Contains all the forecast errors
-    
-    for (k, v) in cast.items():
-        try:
-            # Check and compare dictionaries according to their value type
-            if type(v) == int or type(v) == float:
-                if type(obs[k]) == int or type(obs[k]) == float:
-                    delta[k] = v - obs[k]
-                    continue
-            elif type(v) == dict:
-                delta[k] = make_delta(v, obs[k])
-                continue
-            elif type(v) == str:
-                if v == obs[k]:
-                    delta[k] = 0
-                else:
-                    delta[k] = 1
-            elif type(v):
-                delta[k] = 999999
-                continue
-            else:
-                print(f'there was some other condition not met by the other\
-                checks. Look at {k} and {v}')
-                continue
-        except KeyError as e:
-            print(f'Caught a KeyError..... {e}')
-            # Add whichever key and value needs adding to the delta
-            if k not in obs and '1h' in obs:
-                delta['1h'] = obs['1h']
-                delta[k] = v
-            elif k not in obs and '3h' in obs:
-                delta['3h'] = obs['3h']  
-                delta['1h'] = v
-            continue
-    return delta
 
-def doc_to_inst(doc):
-    ''' Take a document from the instants database and make an Instant object
-    out of it.
-    
-    :param doc: a document from the owmap.legit_inst database
-    :type doc: dictionary
-    '''
-    
-    _id = f"{doc['instant']}{doc['zipcode']}"
-    forecasts = doc['forecasts']
-    observations = doc['weather']
-    return Instant(_id, forecasts, observations)
-
-
-import time
-start_time = time.time() # This is to get the total runtime if this script is
-                         # run as __main__
 if __name__ == '__main__':
     ''' Connect to the database, then move all the legit instants to the remote
     database and clear out any instants that are past and not legit.
     '''
     
+    import time
+    
     import config
     import db_ops
+    from make_instants import update_command_for
 
-    # Set the database here if you must, but it's better to do that in the
-    # config.py file
-#     database = 'owmap'
-    collection = 'instant_temp'
-    col = db_ops.dbncol(config.client, collection, database=config.database)
-    cast_count_all(col.find({}))
-    sweep(col.find({}))
-
-    print(f'Total op time for instant.py was {time.time()-start_time} seconds')
+    start_time = time.time() # This is to get the total runtime if this script is
+                             # run as __main__
+    print('Database sweep in progress...')
+    collection = db_ops.dbncol(   # The local collection
+        config.client,
+        config.instants_collection,
+        config.database
+    )
+    col = db_ops.dbncol(   # The remote collection
+        config.remote_client,
+        config.legit_instants,
+        config.database
+    )
+    col_count = collection.count_documents({})
+    n = 0
+    while n <= col_count:
+        if n%10000 == 0:
+            print(f'working..... n={n}')
+        find_legit(collection.find({})[n:n+100], and_load=True)  
+        n += 100
+    try:
+        find_legit(collection.find({})[:n], and_load=True)
+    except:
+        print('there was some exception')
+    sweep(collection.find({}).batch_size(100))
+    print(f'Total sweep time was {time.time()-start_time} seconds')
