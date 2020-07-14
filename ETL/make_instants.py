@@ -74,12 +74,22 @@ def update_command_for(data):
         if '_type' in data:
             if data['_type'] == 'forecast':
                 updates = {'$push': {'forecasts': data}} # append to forecasts list
-            elif data['_type'] == 'observation':
-                updates = {'$set': {'observation': data}}
+            elif data['_type'] == 'observation' \
+                or data['_type'] == 'observations':
+                updates = {'$set': {'observations': data}}
+            else:
+                print('from update_command_for(): "_type" is in data, but \
+                    it is not forecast or observation or observations')
+                exit(print('Exiting after entering first if of \
+                    update_command_for() and not finding "forecasts", \
+                    "observation", or "observations"'))
             if 'timeplace' in data:
                 filters = {'_id': data['timeplace']}
             if '_id' in data:
                 filters = {'_id': data['_id']}
+            else:
+                print(f'there is no "timeplace" or "_id" in {data}.')
+                exit(print('exiting'))
             return pymongo.UpdateOne(filters, updates,  upsert=True)
         elif 'forecasts' in data or 'observations' in data or 'observation' in data:
 
