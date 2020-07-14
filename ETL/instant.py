@@ -82,7 +82,7 @@ def convert(instants):
     converted = {}
     try:
         if isinstance(instants, dict):
-            print('instant.convert() working on a dict')
+            # print('instant.convert() working on a dict')
             for key, value in instants.items():
                 if 'observation' in value:
                     converted[key] = Instant(
@@ -103,7 +103,7 @@ def convert(instants):
                     )
             return converted
         elif isinstance(instants, pymongo.collection.Collection):
-            print('instant.convert() working on a pymongo.collection.Collection')
+            # print('instant.convert() working on a pymongo.collection.Collection')
             for doc in instants.find({}).batch_size(100):
                 if 'observation' in doc:
                     if 'forecasts' in doc:
@@ -129,7 +129,7 @@ def convert(instants):
                     continue
             return converted
         elif type(instants) == pymongo.cursor.Cursor:
-            print('instant.convert() working on a pymongo.cursor.Cursor')
+            # print('instant.convert() working on a pymongo.cursor.Cursor')
             for doc in instants:
                 if 'observation' in doc:
                     if 'forecasts' in doc:
@@ -237,22 +237,23 @@ def sweep(instants):
                 kee = 'observations'
                 if 'timeplace' in doc:
                     instant = int(doc[kee]['weather']['timeplace'][:-10:-1])
-                if'_id' in doc:
-                    instant = int(doc[kee]['_id'][:-10:-1])
+                if '_id' in doc:
+                    # print(doc['_id'])
+                    instant = int(doc['_id'][:-10:-1])
             elif 'observations' in doc:
                 kee = 'observations'
                 if 'timeplace' in doc:
                     instant = int(doc[kee]['weather']['timeplace'][:-10:-1])
-                if'_id' in doc:
+                if '_id' in doc:
                     val = doc[kee]['weather']['_id'][:-10:-1]
                     instant = int(val)                
             elif 'forecasts' in doc:
                 kee = 'forecasts'
                 for d in doc[kee]:
                     if 'timeplace' in d:
-                        instant = int(d['weather']['timeplace'][:-10:-1])
+                        instant = int(d['timeplace'][:-10:-1])
                     if '_id' in d:
-                        instant = int(d['weather']['_id'][:-10:-1])
+                        instant = int(d['_id'][:-10:-1])
             elif 'errors' in doc:
                 return
             else:
@@ -375,7 +376,7 @@ if __name__ == '__main__':
         {'timeplace': {'$exists': True}}
     ]
     for filters in Filters:
-        print(f'Looping with {filters}')
+        # print(f'Looping with {filters}')
         # col_count = collection.count_documents({})
         col_count = collection.count_documents(filters)
         if col_count == 0:
@@ -392,8 +393,9 @@ if __name__ == '__main__':
             find_legit(collection.find(filters)[:n], and_load=True)
         except:
             print('there was some exception')
-        # sweep(collection.find({}).batch_size(100))
         sweep(collection.find(filters).batch_size(100))
     ### Add the different filters that might help get all the differnt docs
+
+    sweep(collection.find({}).batch_size(100))
 
     print(f'Total sweep time was {time.time()-start_time} seconds')
