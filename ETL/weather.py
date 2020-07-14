@@ -36,7 +36,8 @@ class Weather:
 
         # Create a default weather dict and update it with data.
         weather = {
-            'timeplace': str(geohash.encode(location["lon"], location["lat"])) + str(time.time()),
+            '_id': str(geohash.encode(location["lon"], location["lat"]))\
+                + str(int(time.time())),
             'clouds': '0',
             'rain': {'1h': 0,
                     '3h': 0
@@ -214,15 +215,9 @@ def get_current_weather(location):
                 ref_time = abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time'])
 
             timeplace = str(geohash.encode(location["lon"], location["lat"])) + str(ref_time)
-            print(timeplace)
-
-            ### changing the timeplace from stringcast geocoord dict ###
-            ### changing the timeplace from stringcast geocoord dict ###
-#             result['Weather']['location'] = coordinates
             result['Weather']['_id'] = timeplace
             result['Weather']['time_to_instant'] = ref_time - result['reception_time']            
             weather = Weather(coordinates, 'observation', result['Weather'])
-
             return weather
         except APICallTimeoutError:
             # Reset the API object
