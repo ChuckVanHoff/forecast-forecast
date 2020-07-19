@@ -33,6 +33,7 @@ def forecast(location, as_df=False):
             item['instant'] = pinky.favor(item['dt'])
             item['type'] = 'cast'
             item['_id'] = f'{geo_hash.encode(location)}{item["instant"]}'
+            item['tt_inst'] = item['dt'] - int(time.time())
     return result
 
 def current(location, as_df=False):
@@ -56,5 +57,6 @@ def current(location, as_df=False):
         result['instant'] = pinky.favor(result['dt'])
         result['type'] = 'obs'
         result['_id'] = f'{geo_hash.encode(location)}{result["instant"]}'
+        result['tt_inst'] = result['dt'] - int(time.time())
     return result
     

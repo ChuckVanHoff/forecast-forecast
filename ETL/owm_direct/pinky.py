@@ -100,15 +100,12 @@ def party(locations, breaks=True, batch=60):
             # to the database.
             if n >= batch * 2:
                 if n/2 / (time.time()-start_time) > 1: 
-                    if isinstance(obs, dict):
-                        obs_col.insert_many(obs)
-                        cast_col.insert_many(casts)
-                    elif isinstance(obs, list):
+                    if isinstance(obs, list):
                         obs_col.insert_many(obs)
                         cast_col.insert_many(casts)
                     else:
                         print(type(obs), 'doing nothing')
-                
+
                 # Check the API request rate and wait a lil bit if it's high
                 if n/2 / (time.time() - start_time) > 1:
                     print(f'waiting {start_time - time.time() + 60} seconds.')
@@ -123,10 +120,7 @@ def party(locations, breaks=True, batch=60):
             for cast in forecast['list']:
                 casts.append(cast)
         # Load it to the database
-        if isinstance(obs, dict):
-            obs_col.insert_many(obs)
-            cast_col.insert_many(casts)
-        elif isinstance(obs, list):
+        if isinstance(obs, list):
             obs_col.insert_many(obs)
             cast_col.insert_many(casts)
         else:
