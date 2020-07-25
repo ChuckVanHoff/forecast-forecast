@@ -8,6 +8,7 @@
 
 
 import time
+import json
 import pymongo
 from pymongo import MongoClient
 
@@ -44,7 +45,7 @@ def favor(value, floor=10800, trans=False):
         return
     return temp
 
-def party(locations, breaks=True, batch=60):
+def party(locations, breaks=True, batch=60, e_r=True):
     ''' Get data for the locations given in the argument. 
     
     :param locations: the locations to gather data for
@@ -55,14 +56,21 @@ def party(locations, breaks=True, batch=60):
     :param batch: the number of API calls to be made before hitting the breaks
     :type batch: int. Default is 60, as that is the requests/minute rate for
     free API keys.
+    :param e_r: give error reports or pass over them
+    :type e_r: bool
     '''
-    
+
     num = len(locations)
-    obs = []
-    casts = []
     db = client[config.database]
-    obs_col = db[config.observation_collection]
-    cast_col = db[config.forecast_collection]
+
+    ### add error reports for 
+    error_reports = []
+    ### add error reports for 
+    
+    ### Add this new collection to be the home for all requested data ###
+    weathers_col = db[config.weathers_collection]
+    ### Add this new collection to be the home for all requested data ###
+    
     start_start = time.time()  # This is for timing the WHOLE process.
     if breaks:
         i = 0
@@ -79,20 +87,24 @@ def party(locations, breaks=True, batch=60):
             if num - i < batch:
                 batch = num
 
+            ### Change this to add all the data requested to one collection ###
             # Reset these with each pass of the while loop. #
-            n = 0       
-            obs = []
-            casts = []
-
+            n = 0
+#             obs = []
+#             casts = []
+            data = []
             for loc in locations[i:i+batch]:
                 # Get the current observations and forecasts and add them to
                 # obs and casts lists
-                obs.append(owm_get.current(loc))
+#                 obs.append(owm_get.current(loc))
+                data.append(owm_get.current(loc))
                 n += 1
                 forecast = owm_get.forecast(loc)
                 n += 1
                 for cast in forecast['list']:
-                    casts.append(cast)
+#                     casts.append(cast)
+                    data.append(cast)
+            ### Change this to add all the data requested to one collection ###
 
             # At this point you may have requested more than 60 times per
             # API key. Check the number, then check the requests/min rate;
@@ -100,11 +112,21 @@ def party(locations, breaks=True, batch=60):
             # to the database.
             if n >= batch * 2:
                 if n/2 / (time.time()-start_time) > 1: 
-                    if isinstance(obs, list):
-                        obs_col.insert_many(obs)
-                        cast_col.insert_many(casts)
+#                     if isinstance(obs, list):
+#                         obs_col.insert_many(obs)
+#                         cast_col.insert_many(casts)
+                    if isinstance(data, list):
+                        try:
+                            result = weathers_col.insert_many(data, ordered=False)
+                        except pymongo.errors.BulkWriteError as e:
+#                             print(e.details)
+                            for item in e.details['writeErrors']:
+                                print(type(item))
+#                                 report = {item['errmsg'], item['op']}
+#                                 error_reports.append(report)
+                            print('Added bulkWriteError reports.')
                     else:
-                        print(type(obs), 'doing nothing')
+                        print(type(data), 'doing nothing')
 
                 # Check the API request rate and wait a lil bit if it's high
                 if n/2 / (time.time() - start_time) > 1:
@@ -115,15 +137,23 @@ def party(locations, breaks=True, batch=60):
     else:  # if there are no breaks on the process
         for loc in locations:
             # Get the forecasts and observations.
-            obs.append(owm_get.current(loc))
+            data.append(owm_get.current(loc))
             forecast = owm_get.forecast(loc)
             for cast in forecast['list']:
-                casts.append(cast)
+                data.append(cast)
         # Load it to the database
-        if isinstance(obs, list):
-            obs_col.insert_many(obs)
-            cast_col.insert_many(casts)
+        if isinstance(data, list):
+            weathers_col.insert_many(data)
         else:
-            print(type(obs), 'doing nothing')
-    return f'Completed pinky party and requested for {i} locations. \
-        It all took {int(time.time() - start_start)} seconds'
+            print(type(weathers), 'doing nothing')
+    
+    ### adding write-erros-to-file code ###
+    if e_r:
+        filename = 'error_reports.txt'
+        with open(filename, 'a+') as f:
+            for row in error_reports:
+                f.write(row)#json.dumps(row))
+    ### adding write-erros-to-file code ###
+    
+    return f'''Completed pinky party and requested for {i} locations. 
+    It all took {int(time.time() - start_start)} seconds'''

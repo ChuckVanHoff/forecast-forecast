@@ -9,16 +9,10 @@ instant values. '''
 import time
 
 import pymongo
-from pymongo import MongoClient
-from pymongo.errors import DuplicateKeyError
 
 import db_ops
 import config
 
-# use the local host and port for all the primary operations
-port = config.port #27017
-host = config.host #'localhost'
-client = MongoClient(host, port)
 
 def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
@@ -53,78 +47,12 @@ def update_command_for(data):
     :return: the command that will be used to find and update documents
     '''
     
-    ### ORIGINAL ###
-#     if data['_type'] == 'forecast':
-#         filters = {'_id': data['timeplace']}
-#         updates = {'$push': {'forecasts': data}} # append to forecasts list
-#         return pymongo.UpdateOne(filters, updates,  upsert=True)
-#     elif data['_type'] == 'observation':
-#         filters = {'_id': data['timeplace']}
-#         updates = {'$set': {'observation': data}}
-#         return pymongo.UpdateOne(filters, updates,  upsert=True)
-#     else:
-#         filters = {'_id': 'update_command_for(data)error'}
-#         updates = {'$set': {'errors': data}}
-#         return pymongo.UpdateOne(filters, updates,  upsert=True)
-    ### ORIGINAL ###
-    
-    ### wrap this in a try-except to get past KeyErrors. TEMP FIX FOR FINDING
-    ### LEGITS IN OLD DATA
-    try:
-        if 'type' in data:
-            
-            ### Set the time_to_instant field and value ###
-            data['tt_inst'] = data['instant'] - data['dt']
-            updates = {'$set': {'tt_inst': data### Set the time to instant field and value ###
-            
-            if data['type'] == 'cast':
-                updates = {'$push': {'forecasts': data}} # append to forecasts list
-            elif data['type'] == 'obs':
-                updates = {'$set': {'observation': data}}
-            filters = {'_id': data['_id']}
-                
-        if '_type' in data:
-            if data['_type'] == 'cast':
-                updates = {'$push': {'forecasts': data}} # append to forecasts list
-            if data['_type'] == 'forecast':
-                updates = {'$push': {'forecasts': data}} # append to forecasts list
-            if data['_type'] == 'observation':
-                updates = {'$set': {'observation': data}}
-            if data['_type'] == 'obs':
-                updates = {'$set': {'observation': data}}
-            if 'timeplace' in data:
-                filters = {'_id': data['timeplace']}
-            if '_id' in data:
-                filters = {'_id': data['_id']}
-            return pymongo.UpdateOne(filters, updates,  upsert=True)
-        elif 'forecasts' in data or 'observations' in data or 'observation' in data:
-
-            ### change the key name from observaTION to observaTIONS ###
-            if 'observation' in data:
-                data['observations'] = data.pop('observation')
-            ### change the key name from observaTION to observaTIONS ###
-
-            ### I am not sure if there will be '_id' or 'timeplace' in the data
-            ### coming in from the function argument.
-#             filters = {'_id': data['_id']}
-                try:
-                    filters = {'_id': data['_id']}
-                except KeyError as e:
-                    print(f'KeyError: {e}. Attempt setting filter using timeplace')
-                    filters = {'_id': data['timeplace']}
-            ### I am not sure if there will be '_id' or 'timeplace' in the data
-            ### coming in from the function argument.
-
-            return pymongo.InsertOne(data)
-    except KeyError as e:
-        print(f'Had a KeyError for {e} while attempting update_command_for(). \
-        In case you are curious, these are the keys that are in the data: \
-        {data.keys()}')
-        updates = {'$set': {'errors': data}}
-        filters = {'_id': 'update_command_for(data)error'}
-        return pymongo.UpdateOne(filters, updates,  upsert=True)
-    ### wrap this in a try-except to get past KeyErrors. TEMP FIX FOR FINDING
-    ### LEGITS IN OLD DATA
+    tti = {str(data['tt_inst']): data}  # Take the tt_inst from data and set it
+                                    # up as the key for the data set.
+    updates = {'$set': tti} 
+    filters = {'_id': data['timeplace']}  # Add the data to the object with
+                                    # a matching timeplace
+    return pymongo.UpdateOne(filters, updates,  upsert=True)
 
 def make_load_list_from_cursor(cursor):
     ''' create the list of objects from the database to be loaded through
@@ -135,18 +63,29 @@ def make_load_list_from_cursor(cursor):
     :return update_list: list of update commands for the weather objects on the
     cursor
     '''
+    
+    print(type(cursor))
 
     update_list = []
     
-    try:
-        n=0
-        for obj in cursor:
-            update_list.append(update_command_for(obj))
-            n+=1
-        return update_list
-    except:
-        print('Error making load_list')
-        return load_list[:n]
+    for obj in cursor:
+        update_list.append(update_command_for(obj))
+#     print(len(update_list))
+    if len(update_list) == 0:
+        print('update_list is empty')
+        exit()
+#     else:
+#         print(update_list)
+    return update_list
+#     try:
+#         n=0
+#         for obj in cursor:
+#             update_list.append(update_command_for(obj))
+#             n+=1
+#         return update_list
+#     except:
+#         print('Error making load_list')
+#         return update_list[:n]
 
 def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     ''' Move or copy a collection within and between databases. 
@@ -180,66 +119,39 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
         print(e)
     return
 
-def make_instants(client, cast_col, obs_col, inst_col):
+def make_instants():
     ''' Make the instant documents, as many as you can, with the data in the
     named database.
     
     - Process: Connect to the database, get the data from the database, make a
     list lf load commands to get each document sorted into its proper instant
     document, and finally move the sorted documents to their archives.
-    
-    :param client: a MongoDB client
-    :type client: pymongo.MongoClient
     '''
     
     #Get the data
-    cast_col = db_ops.dbncol(client, cast_col, config.database)
-    obs_col = db_ops.dbncol(client, obs_col, config.database)
-    inst_col = db_ops.dbncol(client, inst_col, config.database)
-    print('Just finished making the collecitons')
-    ### ADD THESE .batch_size() METHODS TO THE CURSORS ###
-#     forecasts = cast_col.find({})
-#     observations = obs_col.find({})
-    forecasts = cast_col.find({}).batch_size(100)
-    observations = obs_col.find({}).batch_size(100)
-    print('Just finished finding the data...here is an observation:', observations[0])
-    n=0
-    for ob in observations:
-        print(ob)
-        if n==3:
-            break
-        n+=1
-    ### ADD THESE .batch_size() METHODS TO THE CURSORS ###
-    
-    inst_col.create_index([('timeplace', pymongo.DESCENDING)])
+    weather_col = db_ops.dbncol(
+        config.client,
+        config.weathers_collection,
+        config.database
+    )
+    inst_col = db_ops.dbncol(
+        config.client,
+        config.instants_collection,
+        config.database
+    )
+    weathers = weather_col.find({}).batch_size(100)
+#     print(weathers[0])
+    inst_col.create_index('timeplace')
     
     # make the load lists and load the data
-    print('making cast load list....')
-    cast_load_list = make_load_list_from_cursor(forecasts)
-    print('Just finished ')
-    print(cast_load_list)
-    print('making the obs load list')
-    obs_load_list = make_load_list_from_cursor(observations)
-    print('Just finished ')
-    cast_inserted = inst_col.bulk_write(cast_load_list).upserted_ids
-    obs_inserted = inst_col.bulk_write(obs_load_list).upserted_ids
+    weathers_load_list = make_load_list_from_cursor(weathers)
+    weathers_inserted = inst_col.bulk_write(weathers_load_list).upserted_ids
 
-#    # Copy the docs to archive storage and delete the source data.
-#    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
-#    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
-
-    # Delete the used documents. The data is all contained in the insants, so
-    # there's no reason to keep it around taking up space.
-    cast_update_list = []
-    obs_update_list = []
-    for c_id in cast_inserted.values():
-        c_id = {'_id': c_id}
-        cast_update_list.append(pymongo.operations.DeleteOne(c_id))
-    for o_id in obs_inserted.values():
-        o_id = {'_id': o_id}
-        obs_update_list.append(pymongo.operations.DeleteOne(o_id))
-    if cast_update_list:
-        cast_col.bulk_write(cast_update_list)
-    if obs_update_list:
-        obs_col.bulk_write(obs_update_list)
+    # Delete the used documents.
+    weathers_update_list = []
+    for w_id in weathers_inserted.values():
+        w_id = {'_id': w_id}
+        weathers_update_list.append(pymongo.operations.DeleteOne(w_id))
+    if weathers_update_list:
+        weather_col.bulk_write(weathers_update_list, ordered=False)
     return
