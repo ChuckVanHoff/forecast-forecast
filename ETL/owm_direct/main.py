@@ -7,5 +7,5 @@ import pinky_pie
 
 hash_list = geo_hash.make()
 locations = geo_hash.decode(hash_list)
-pinky.party(locations[:5])
-pinky_pie.sweep(config.instants_collection)
+pinky.party(locations[:105])
+pinky_pie.sweep(config.instants_collections.find())

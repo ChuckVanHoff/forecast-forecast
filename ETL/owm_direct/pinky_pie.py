@@ -138,16 +138,9 @@ def sweep(instants):
     if not isinstance(instants, pymongo.cursor.Cursor):
         raise ValueError(f'instants is a {type(instants)}..gotta be a cursor')
     
-    col = db_ops.dbncol(
-        config.client,
-        config.instants_collection,
-        config.database
-    )
-    n = 0
     for doc in instants:
         if doc['instant'] < time.time()-453000:
             col.delete_one(doc)
-            n += 1
     return
 
 def find_legit(instants, and_load=True):

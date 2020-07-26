@@ -76,6 +76,7 @@ ioveralls.ipynb
 geohash.ipynb
 use_inst.ipynb
 d_frame.ipynb
+i*.ipynb
 
 # pyenv
 .python-version
