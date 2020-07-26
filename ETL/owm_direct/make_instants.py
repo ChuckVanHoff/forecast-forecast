@@ -63,19 +63,13 @@ def make_load_list_from_cursor(cursor):
     :return update_list: list of update commands for the weather objects on the
     cursor
     '''
-    
-    print(type(cursor))
 
     update_list = []
     
     for obj in cursor:
         update_list.append(update_command_for(obj))
-#     print(len(update_list))
     if len(update_list) == 0:
         print('update_list is empty')
-        exit()
-#     else:
-#         print(update_list)
     return update_list
 #     try:
 #         n=0
@@ -140,7 +134,6 @@ def make_instants():
         config.database
     )
     weathers = weather_col.find({}).batch_size(100)
-#     print(weathers[0])
     inst_col.create_index('timeplace')
     
     # make the load lists and load the data

@@ -14,6 +14,7 @@ from pymongo import MongoClient
 
 import owm_get
 import geo_hash
+import make_instants
 import config
 
 
@@ -62,14 +63,9 @@ def party(locations, breaks=True, batch=60, e_r=True):
 
     num = len(locations)
     db = client[config.database]
-
-    ### add error reports for 
     error_reports = []
-    ### add error reports for 
     
-    ### Add this new collection to be the home for all requested data ###
     weathers_col = db[config.weathers_collection]
-    ### Add this new collection to be the home for all requested data ###
     
     start_start = time.time()  # This is for timing the WHOLE process.
     if breaks:
@@ -87,24 +83,18 @@ def party(locations, breaks=True, batch=60, e_r=True):
             if num - i < batch:
                 batch = num
 
-            ### Change this to add all the data requested to one collection ###
             # Reset these with each pass of the while loop. #
             n = 0
-#             obs = []
-#             casts = []
             data = []
             for loc in locations[i:i+batch]:
-                # Get the current observations and forecasts and add them to
-                # obs and casts lists
-#                 obs.append(owm_get.current(loc))
+                # Get the current observations and forecasts and keep count
+                # of api requests with n.
                 data.append(owm_get.current(loc))
                 n += 1
                 forecast = owm_get.forecast(loc)
                 n += 1
                 for cast in forecast['list']:
-#                     casts.append(cast)
                     data.append(cast)
-            ### Change this to add all the data requested to one collection ###
 
             # At this point you may have requested more than 60 times per
             # API key. Check the number, then check the requests/min rate;
@@ -112,29 +102,27 @@ def party(locations, breaks=True, batch=60, e_r=True):
             # to the database.
             if n >= batch * 2:
                 if n/2 / (time.time()-start_time) > 1: 
-#                     if isinstance(obs, list):
-#                         obs_col.insert_many(obs)
-#                         cast_col.insert_many(casts)
                     if isinstance(data, list):
                         try:
                             result = weathers_col.insert_many(data, ordered=False)
                         except pymongo.errors.BulkWriteError as e:
-#                             print(e.details)
                             for item in e.details['writeErrors']:
-                                print(type(item))
-#                                 report = {item['errmsg'], item['op']}
-#                                 error_reports.append(report)
+                                report = {item['errmsg'], item['op']}
+                                error_reports.append(report)
                             print('Added bulkWriteError reports.')
                     else:
-                        print(type(data), 'doing nothing')
+                        print(type(data), 'pinky.party() doing nothing')
 
-                # Check the API request rate and wait a lil bit if it's high
+                # Check the API request rate and wait a lil bit if it's high,
+                # otherwise take advantage of the wait time to make_instants.
+                if n/2 / (time.time()-start_time) > 1:
+                    make_instants.make_instants()
                 if n/2 / (time.time() - start_time) > 1:
                     print(f'waiting {start_time - time.time() + 60} seconds.')
                     time.sleep(start_time - time.time() + 60)
                     start_time = time.time()
             i += int(n/2)
-    else:  # if there are no breaks on the process
+    else:  # if there are no breaks on the process...
         for loc in locations:
             # Get the forecasts and observations.
             data.append(owm_get.current(loc))
@@ -147,13 +135,10 @@ def party(locations, breaks=True, batch=60, e_r=True):
         else:
             print(type(weathers), 'doing nothing')
     
-    ### adding write-erros-to-file code ###
     if e_r:
         filename = 'error_reports.txt'
         with open(filename, 'a+') as f:
             for row in error_reports:
-                f.write(row)#json.dumps(row))
-    ### adding write-erros-to-file code ###
-    
+                f.write(row)    
     return f'''Completed pinky party and requested for {i} locations. 
     It all took {int(time.time() - start_start)} seconds'''
