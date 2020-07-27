@@ -45,6 +45,7 @@ def get_and_make(codes):
                 # calls made; API calls limited to a maximum 60/minute/apikey.
     start_time = time.time()
     for code in codes:
+        print(code)
         try:
             current = weather.get_current_weather(code)
             n+=1 
@@ -128,12 +129,19 @@ if __name__ == '__main__':
     b32 = '0123456789bcdefghjkmnpqrstuvwxyz'
     hl = [f'dn{p3}{p4}{p5}' for p3 in b32[16:24] for p4 in b32 for p5 in b32]
     locations = []  # Coordinate list
+    n=0
     for row in hl:
+        ghash = geohash.decode(row)
         cd = {}  # Coordinate dict
-        cd['lon'] = geohash.decode(row)[0]
-        cd['lat'] = geohash.decode(row)[1]
+#         cd['lat'] = geohash.decode(row)[0]
+#         cd['lon'] = geohash.decode(row)[1]
+        cd['lat'] = ghash[0]
+        cd['lon'] = ghash[1]
         locations.append(cd)
+        if n<5:
+            print(cd)
+            n+=1
 
-    limit = 200
+    limit = config.test_limit
     print(f'The number of locations is limited to {limit}.')
     get_and_make(locations[:limit])

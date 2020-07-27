@@ -1,4 +1,4 @@
-''' setup the client and api and configuation for forecast-forecast '''
+# ''' setup the client and api and configuation for forecast-forecast '''
 
 # from urllib.parse import quote
 
@@ -14,3 +14,9 @@
 # print(f'from Transform.__init__() {uri}')
 # client = Client(host, port)  # sets a global pymongo MongoClient object 
 # remote_client = Client(uri)
+
+
+import path
+
+# Add the current directory to the system PATH
+path.add_dir_to_path()
