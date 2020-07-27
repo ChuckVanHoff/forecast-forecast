@@ -3,6 +3,7 @@ import json
 import requests
 import pandas as pd
 
+import api_handles
 import geo_hash
 import pinky
 import config
@@ -23,8 +24,11 @@ def forecast(location, as_df=False):
     lat = location['lat']
     lon = location['lon']
     url = f'http://api.openweathermap.org/data/2.5/forecast?lat={location["lat"]}&lon={location["lon"]}&appid={cast_key}'
-    result = requests.get(url).json()
-    if as_df:
+    result = api_handles.retry(requests.get, url).json()
+    if result == -1:
+        result = {'loc': location, 'time': time.ctime()}
+#     result = requests.get(url).json()
+    elif as_df:
         result = pd.json_normalize(result)
     else:
         # Add the field 'instant' to each data set in the forecast.
@@ -49,8 +53,12 @@ def current(location, as_df=False):
     lat = location['lat']
     lon = location['lon']
     url = f'http://api.openweathermap.org/data/2.5/weather?lat={location["lat"]}&lon={location["lon"]}&appid={obs_key}'
-    result = requests.get(url).json()
-    if as_df:
+  
+    result = api_handles.retry(requests.get, url).json()
+    if result == -1:
+        result = {'loc': location, 'time': time.ctime()}
+#     result = requests.get(url).json()
+    elif as_df:
         result = pd.json_normalize(result)
     else:
         result['location'] = location
