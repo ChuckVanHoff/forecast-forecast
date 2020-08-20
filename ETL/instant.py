@@ -396,6 +396,4 @@ if __name__ == '__main__':
         sweep(collection.find(filters).batch_size(100))
     ### Add the different filters that might help get all the differnt docs
 
-    sweep(collection.find({}).batch_size(100))
-
-    print(f'Total sweep time was {time.time()-start_time} seconds')
+   print(f'Total sweep time was {time.time()-start_time} seconds')
