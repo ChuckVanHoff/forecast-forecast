@@ -1,3 +1,5 @@
+import time
+
 import pymongo
 
 import config
@@ -139,8 +141,11 @@ def sweep(instants):
         raise ValueError(f'instants is a {type(instants)}..gotta be a cursor')
     
     for doc in instants:
-        if doc['instant'] < time.time()-453000:
-            col.delete_one(doc)
+        try:
+            if doc['instant'] < time.time()-453000:
+                col.delete_one(doc)
+        except KeyError:
+            continue
     return
 
 def find_legit(instants, and_load=True):

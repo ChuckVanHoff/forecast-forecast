@@ -398,12 +398,7 @@ if __name__ == '__main__':
             print('there was some exception')
         sweep(collection.find(filters).batch_size(100))
     ### Add the different filters that might help get all the differnt docs
-<<<<<<< Updated upstream
 
-    sweep(collection.find({}).batch_size(100))
-
-=======
     
     sweep(collection.find({}).batch_size(100))
->>>>>>> Stashed changes
     print(f'Total sweep time was {time.time()-start_time} seconds')

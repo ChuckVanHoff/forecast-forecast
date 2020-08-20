@@ -62,11 +62,12 @@ def party(locations, breaks=True, batch=60, e_r=True):
     '''
 
     num = len(locations)
-    db = client[config.database]
     error_reports = []
     
+    db = client[config.database]
     weathers_col = db[config.weathers_collection]
     
+    print('Lets get this party started!!')
     start_start = time.time()  # This is for timing the WHOLE process.
     if breaks:
         i = 0
@@ -115,11 +116,15 @@ def party(locations, breaks=True, batch=60, e_r=True):
 
                 # Check the API request rate and wait a lil bit if it's high,
                 # otherwise take advantage of the wait time to make_instants.
-                if n/2 / (time.time()-start_time) > 1:
-                    make_instants.make_instants()
+# This is a temporary stop until it's functioning more efficiently
+#                 if n/2 / (time.time()-start_time) > 1:
+#                     make_instants.make_instants()
                 if n/2 / (time.time() - start_time) > 1:
                     print(f'waiting {start_time - time.time() + 60} seconds.')
                     time.sleep(start_time - time.time() + 60)
+                    start_time = time.time()
+                else:
+                    print(f'been waiting for something like {time.time() - start_time - 60} seconds.')
                     start_time = time.time()
             i += int(n/2)
     else:  # if there are no breaks on the process...
@@ -140,5 +145,6 @@ def party(locations, breaks=True, batch=60, e_r=True):
         with open(filename, 'a+') as f:
             for row in error_reports:
                 f.write(row)    
-    return f'''Completed pinky party and requested for {i} locations. 
-    It all took {int(time.time() - start_start)} seconds'''
+    print(f'''Completed pinky party and requested for {i} locations. 
+    It all took {int(time.time() - start_start)} seconds''')
+    return
