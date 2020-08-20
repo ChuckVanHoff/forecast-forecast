@@ -209,13 +209,8 @@ def get_current_weather(location):
             else:
                 ref_time = 10800 * (result['Weather']['reference_time']//10800)
             
-            hash_string = str(geohash.encode(location["lon"], location["lat"]))
-            # print(hash_string, ref_time)
+            hash_string = str(geohash.encode(location["lon"], location["lat"]))  # The geohash for location used in timeplace
             timeplace = hash_string + str(ref_time)
-            # print(timeplace)
-            # print(result)
-            # exit()
-            
             result['Weather']['_id'] = timeplace
             result['Weather']['time_to_instant'] = ref_time - result['reception_time']            
             weather = Weather(coordinates, 'observation', result['Weather'])

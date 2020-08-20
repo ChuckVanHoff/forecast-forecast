@@ -18,7 +18,11 @@ def load_weather(data, client, database, collection):
     :type database: str
     :param collection: the database collection to be used
     :type collection: str
-    ''' 
+    '''
+
+    import pymongo
+    import db_ops
+ 
     col = db_ops.dbncol(client, collection, database=database)
     # decide how to handle the loading process depending on where the document
     # will be loaded.
@@ -37,8 +41,8 @@ def load_weather(data, client, database, collection):
         # Now attempt to load the data using the filters and updates.
         try:
             col.find_one_and_update(filters, updates,  upsert=True)
-        except DuplicateKeyError:
-            return(f'DuplicateKeyError, could not insert data to {collection}')
+        except:# pymongo.errorsDuplicateKeyError:
+            return#(f'DuplicateKeyError, could not insert data to {collection}')
     
     elif collection == 'observed'\
         or collection == 'forecasted'\
@@ -46,5 +50,5 @@ def load_weather(data, client, database, collection):
         or collection == 'cast_temp':
         try:
             col.insert_one(data)
-        except DuplicateKeyError:
-            return(f'DuplicateKeyError, could not insert data to {collection}')
+        except:# DuplicateKeyError:
+            return#(f'DuplicateKeyError, could not insert data to {collection}')
