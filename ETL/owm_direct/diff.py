@@ -215,4 +215,6 @@ def do_diff_process(col):
 
 
 if __name__ == '__main__':
-    do_diff_process(col)
+    diffs = do_diff_process(col)
+    diffs = diffs.to_numpy()
+    np.save('diffs.npy', diffs)
