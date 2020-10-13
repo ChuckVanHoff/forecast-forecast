@@ -236,24 +236,24 @@ def sweep(instants):
                 doc['observations'] = doc['observation']
                 kee = 'observations'
                 if 'timeplace' in doc:
-                    instant = int(doc[kee]['weather']['timeplace'][:-10:-1])
+                    instant = int(doc[kee]['weather']['timeplace'][-10:])
                 if '_id' in doc:
                     # print(doc['_id'])
-                    instant = int(doc['_id'][:-10:-1])
+                    instant = int(doc['_id'][-10:])
             elif 'observations' in doc:
                 kee = 'observations'
                 if 'timeplace' in doc:
-                    instant = int(doc[kee]['weather']['timeplace'][:-10:-1])
+                    instant = int(doc[kee]['weather']['timeplace'][-10:])
                 if '_id' in doc:
-                    val = doc[kee]['weather']['_id'][:-10:-1]
+                    val = doc[kee]['weather']['_id'][-10:]
                     instant = int(val)                
             elif 'forecasts' in doc:
                 kee = 'forecasts'
                 for d in doc[kee]:
                     if 'timeplace' in d:
-                        instant = int(d['timeplace'][:-10:-1])
+                        instant = int(d['timeplace'][-10:])
                     if '_id' in d:
-                        instant = int(d['_id'][:-10:-1])
+                        instant = int(d['_id'][-10:])
             elif 'errors' in doc:
                 return
             else:
@@ -266,7 +266,10 @@ def sweep(instants):
         ### been processed and just leave the following if statement.
         
             if instant < time.time()-453000:
+                print(doc)
+                print(instant, time.time()-453000)
                 col.delete_one(doc)
+#                 print('just deleted a doc form instand temp')
                 n += 1
     else:
         print(f'You want me to sweep instants that are {type(instants)}\'s.')
@@ -396,4 +399,6 @@ if __name__ == '__main__':
         sweep(collection.find(filters).batch_size(100))
     ### Add the different filters that might help get all the differnt docs
 
-   print(f'Total sweep time was {time.time()-start_time} seconds')
+    
+    sweep(collection.find({}).batch_size(100))
+    print(f'Total sweep time was {time.time()-start_time} seconds')

@@ -18,7 +18,7 @@ import config
 # use the local host and port for all the primary operations
 port = config.port #27017
 host = config.host #'localhost'
-client = MongoClient(host, port)
+client = config.client
 
 def find_data(database, collection, filters={}):
     ''' Find the items in the specified database and collection using the filters.
@@ -142,39 +142,11 @@ def make_load_list_from_cursor(cursor):
         print('Error making load_list')
         return load_list[:n]
 
-def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-    ''' Move or copy a collection within and between databases. 
-    
-    :param col: the collection to be copied
-    :type col: a pymongo collection or 
-    :param destination_col: the collection you want the documents copied into
-    :type destination_col: a pymongo.collection.Collection object
-    :param destination_db: the database with the collection you want the
-    documents copied into
-    :type destination_db: a pymongo database pymongo.databse.Database
-    :param filters: a filter for the documents to be copied from the collection.
-    :type filters: dict
-    :param delete: Determine if the orignials should be deleted. Default is no.
-    :type delete: bool
-    '''
-
-    copy = []
-    for item in col.find(filters):
-        copy.append(item)
-    destination = db_ops.dbncol(client, destination_col, destination_db)    
-    try:
-        inserted_ids = destination.insert_many(copy).inserted_ids
-        if delete == True:
-            # remove all the documents from the original collection
-            for row in inserted_ids:
-                filters = {'_id': row}
-                col.delete_one(filters)
-    except pymongo.errors.BulkWriteError as e:
-        print(f'The documents have not been copied to {destination_col}.')
-        print(e)
-    return
-
-def make_instants(client, cast_col, obs_col, inst_col):
+def make_instants(client,
+                  cast_col=config.forecast_collection,
+                  obs_col=config.observation_collection,
+                  inst_col=config.instants_collection
+                 ):
     ''' Make the instant documents, as many as you can, with the data in the
     named database.
     
@@ -187,41 +159,66 @@ def make_instants(client, cast_col, obs_col, inst_col):
     '''
     
     #Get the data
-    cast_col = db_ops.dbncol(client, cast_col, config.database)
-    obs_col = db_ops.dbncol(client, obs_col, config.database)
-    inst_col = db_ops.dbncol(client, inst_col, config.database)
+    forecasts = db_ops.dbncol(client, cast_col, config.database)
+    observations = db_ops.dbncol(client, obs_col, config.database)
+    instants = db_ops.dbncol(client, inst_col, config.database)
 
-    ### ADD THESE .batch_size() METHODS TO THE CURSORS ###
-#     forecasts = cast_col.find({})
-#     observations = obs_col.find({})
-    forecasts = cast_col.find({}).batch_size(100)
-    observations = obs_col.find({}).batch_size(100)
-    ### ADD THESE .batch_size() METHODS TO THE CURSORS ###
     
-    inst_col.create_index([('timeplace', pymongo.DESCENDING)])
+    ### Added the function sub_make() to help break up the really big cursors
+    cast_count = forecasts.count_documents({})
+    obs_count = observations.count_documents({})
+    print(cast_count)
+    print(obs_count)
+    n = 0
+    m = 0
     
-    # make the load lists and load the data
-    cast_load_list = make_load_list_from_cursor(forecasts)
-    obs_load_list = make_load_list_from_cursor(observations)
-    cast_inserted = inst_col.bulk_write(cast_load_list).upserted_ids
-    obs_inserted = inst_col.bulk_write(obs_load_list).upserted_ids
+    def sub_make(sub_col):
+        ''' sub_col is some cursor on the collection'''
+#         print('in sub_make()')
+        instants.create_index([('_id', pymongo.ASCENDING)])
+        # make the load lists and load the data
+        load_list = make_load_list_from_cursor(sub_col)
+        if len(load_list) == 0:
+            return -1
+        inserted = instants.bulk_write(load_list).upserted_ids
 
-#    # Copy the docs to archive storage and delete the source data.
-#    copy_docs(cast_col, config.database, 'cast_archive', delete=True)
-#    copy_docs(obs_col, config.database, 'obs_archive', delete=True)
+        # Delete the used documents.
+        update_list = []
+        for _id in inserted.values():
+            _id = {'_id': _id}
+            update_list.append(pymongo.operations.DeleteOne(_id))
+        if update_list:
+            return update_list
+        else:
+            return -1
 
-    # Delete the used documents. The data is all contained in the insants, so
-    # there's no reason to keep it around taking up space.
-    cast_update_list = []
-    obs_update_list = []
-    for c_id in cast_inserted.values():
-        c_id = {'_id': c_id}
-        cast_update_list.append(pymongo.operations.DeleteOne(c_id))
-    for o_id in obs_inserted.values():
-        o_id = {'_id': o_id}
-        obs_update_list.append(pymongo.operations.DeleteOne(o_id))
-    if cast_update_list:
-        cast_col.bulk_write(cast_update_list)
-    if obs_update_list:
-        obs_col.bulk_write(obs_update_list)
+    while n+100 < cast_count:
+#         print('processing casts')
+#         print(n)
+        casts = forecasts.find({})[n:n+100]
+        inserts = sub_make(casts)
+        n += 100
+#         print(n)
+#         forecasts = db_ops.dbncol(client, cast_col, config.database)
+        if inserts == -1:
+            continue
+        else:
+            forecasts.bulk_write(inserts)
+    while m+100 < obs_count:
+#         print('processing obs')
+#         inst_col.create_index([('timeplace', pymongo.DESCENDING)])
+        obs = observations.find({})[m:m+100]
+        inserts = sub_make(obs)
+        m += 100
+#         observations = db_ops.dbncol(client, obs_col, config.database)
+        if inserts == -1:
+            continue
+        else:
+            observations.bulk_write(inserts)
+
+#     print('past the sub_make() loops and on to the final stretch')
+    sub_make(forecasts.find({})[:n])
+    sub_make(observations.find({})[:n])
+    ### Added the function sub_make() to help break up the really big cursors
+#     print('Finished')
     return

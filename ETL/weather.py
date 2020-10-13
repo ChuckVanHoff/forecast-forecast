@@ -36,8 +36,7 @@ class Weather:
 
         # Create a default weather dict and update it with data.
         weather = {
-            '_id': str(geohash.encode(location["lon"], location["lat"]))\
-                + str(int(time.time())),
+            '_id': str(location) + str(int(time.time())),
             'clouds': '0',
             'rain': {'1h': 0,
                     '3h': 0
@@ -72,17 +71,17 @@ class Weather:
         self.type = _type
         self.loc = location
         self.weather = weather
-       # make the "timeplace" for each weather according to its type
-        if _type == 'forecast':
-            self.timeplace = f'{str(geohash.encode(location["lon"], location["lat"]))}{str(data["reference_time"])}'
-        elif _type == 'observation':
-            self.timeplace = f'{str(geohash.encode(location["lon"], location["lat"]))}{str(10800 * (data["reference_time"]//10800 + 1))}'
-        else:
+#        # make the "timeplace" for each weather according to its type
+#         if _type == 'forecast':
+#             self. = f'{str(geohash.encode(location["lon"], location["lat"]))}{str(data["reference_time"])}'
+#         elif _type == 'observation':
+#             self.timeplace = f'{str(geohash.encode(location["lon"], location["lat"]))}{str(10800 * (data["reference_time"]//10800 + 1))}'
+#         else:
             
-            ### add to add a look for _id in weather ###
-            self.timeplace = weather['timeplace']
-            self._id = weather['_id']
-        self.as_dict = {'_id': self.timeplace, \
+#             ### add to add a look for _id in weather ###
+#             self.timeplace = weather['_id']
+        self._id = weather['_id']
+        self.as_dict = {'_id': self._id, \
                         '_type': self.type, \
                         'weather': self.weather \
                        }
@@ -202,18 +201,24 @@ def get_current_weather(location):
             coordinates = result['Location']['coordinates']
                         
             # Set the reference_time to the nearest instant.
-            time_to_next = abs(10800 * (result['Weather']['reference_time']//10800 + 1) - result['Weather']['reference_time'])
-            time_to_previous = abs(10800 * (result['Weather']['reference_time']//10800) - result['Weather']['reference_time'])
+            time_to_next = abs(
+                10800 * (result['Weather']['reference_time']//10800 + 1)
+                - result['Weather']['reference_time'])
+            time_to_previous = abs(
+                10800 * (result['Weather']['reference_time']//10800)
+                - result['Weather']['reference_time'])
             if time_to_next <= time_to_previous:
                 ref_time = 10800 * (result['Weather']['reference_time']//10800 + 1)
             else:
                 ref_time = 10800 * (result['Weather']['reference_time']//10800)
             
+            # The geohash for location used in timeplace
             hash_string = str(geohash.encode(location["lon"], location["lat"]))  # The geohash for location used in timeplace
             timeplace = hash_string + str(ref_time)
             result['Weather']['_id'] = timeplace
             result['Weather']['time_to_instant'] = ref_time - result['reception_time']            
             weather = Weather(coordinates, 'observation', result['Weather'])
+            print(weather._id)
             return weather
         except APICallTimeoutError:
             # Reset the API object
@@ -242,7 +247,7 @@ def five_day(location):
     for data in forecast['weathers']:
         # Make an timeplace for the next Weather to be created, create the
         # Weather, append it to the casts list.
-        data['_id'] = str(geohash.encode(location["lon"], location["lat"])) + str(data['reference_time'])
+        data['_id'] = str(geohash.encode(location["lat"], location["lon"])) + str(data['reference_time'])
         data['time_to_instant'] = data['reference_time'] \
                                 - forecast['reception_time']
         casts.append(Weather(location, 'forecast', data))

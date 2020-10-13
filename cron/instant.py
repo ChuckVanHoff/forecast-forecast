@@ -265,7 +265,7 @@ def sweep(instants):
         ### This can probably be deleted if all the past collected data has
         ### been processed and just leave the following if statement.
         
-            if instant < time.time()-453000:
+            if instant < time.time()-500000:
                 col.delete_one(doc)
                 n += 1
     else:
@@ -347,13 +347,19 @@ if __name__ == '__main__':
     '''
     
     import time
-    
+
     import config
+    import make_instants
     import db_ops
-    from make_instants import update_command_for
 
     start_time = time.time() # This is to get the total runtime if this script is
                              # run as __main__
+    make_instants.make_instants(
+        config.client,
+        config.forecast_collection,
+        config.observation_collection,
+        config.instants_collection
+    )
     print('Database sweep in progress...')
     collection = db_ops.dbncol(   # The local collection
         config.client,
@@ -395,7 +401,12 @@ if __name__ == '__main__':
             print('there was some exception')
         sweep(collection.find(filters).batch_size(100))
     ### Add the different filters that might help get all the differnt docs
-
-    sweep(collection.find({}).batch_size(100))
-
+    
+    inst_count = collection.count_documents({})
+    i = 0
+    while i+100 < inst_count:
+#         print('processing casts')
+        col = collection.find({})[i:i+100]
+        sweep(col)
+        i += 100
     print(f'Total sweep time was {time.time()-start_time} seconds')
