@@ -215,6 +215,10 @@ def do_diff_process(col):
 
 
 if __name__ == '__main__':
-    diffs = do_diff_process(col)
+    inst_list = []
+    diffs = do_diff_process(col, inst_list=inst_list)
     diffs = diffs.to_numpy()
+    instants = pd.concat(inst_list)
+    np.save('instants.npy', instants)
     np.save('diffs.npy', diffs)
+    
