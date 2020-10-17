@@ -42,7 +42,7 @@ def timeplaces(col, only_legit=False):
         legits = []
         for doc in timeplaces:
             tp = col.find({'timeplace': doc})
-            if col.count_documents({'timeplace': doc}) >= 11:
+            if col.count_documents({'timeplace': doc}) == 16:
                 legits.append(doc)
         with open('legit_timeplaces.txt', 'w') as lt:
             for row in legits:
@@ -97,12 +97,12 @@ def flatten_to_single_row(df):
     :type df: pandas.DataFrame
     '''
 
-    df.reset_index(inplace=True)
+    df_copy = df.reset_index()
     index = []
     data = []
     # Create corrosponding lists of index names and data items that will be
     # used to create a dataframe.
-    for row in df.iterrows():
+    for row in df_copy.iterrows():
         for d, i in zip(row[1], row[1].index):
             index.append(str(i)+str(row[0]))
             data.append(d)
@@ -202,7 +202,8 @@ def make_diff(from_list=None, from_df=None, inst_list=None):
                     diff = cast.subtract(obs, axis=1)#.set_index('timeplace')
                     dfs.append(diff)
                     if isinstance(inst_list, list):  # Append this given param for use outside
-                        inst_list.append(cast)  # this function.
+                        cast_dfs.append(cast)  # this function.
+    inst_list.append(pd.concat(cast_dfs))
     return pd.concat(dfs)
 
 def do_diff_process(col, inst_list=None):
@@ -220,18 +221,30 @@ def do_diff_process(col, inst_list=None):
     # Get all the unique complete timeplaces in the database into a list.
     legits = timeplaces(col, only_legit=True)
     
-    for tp in legits[:100]:
+    for tp in legits[:]:
         print(tp)
         filters = {'timeplace': tp}
         df_list = records_to_rows(col, filters=filters, as_list=True)
-        diff_list.append(flatten_to_single_row(make_diff(from_list=df_list, inst_list=inst_list)))
+        diff_df = make_diff(from_list=df_list, inst_list=inst_list)
+        diff_df = flatten_to_single_row(diff_df).set_index('timeplace0')
+        diff_list.append(diff_df)
+        
     return pd.concat(diff_list)
 
 
 if __name__ == '__main__':
     inst_list = []
-    diffs = do_diff_process(col, inst_list=inst_list)
-    diffs = diffs.to_numpy()
-    instants = pd.concat(inst_list)
+
+    diffss = do_diff_process(col, inst_list=inst_list)
+    inst_list = [flatten_to_single_row(df).set_index('timeplace0') for df in inst_list]
+    instantss = pd.concat(inst_list)
+    
+    if diffss.shape == instantss.shape:
+        print('checks out!')
+    else:
+        print(diffss.shape, instantss.shape)
+    diffs = diffss.to_numpy()
+    instants = instantss.to_numpy()
+    
     np.save('instants.npy', instants)
     np.save('diffs.npy', diffs)
