@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import pandas as pd
 import benedict
@@ -26,7 +28,7 @@ def tups_to_dict(tups):
         dicti.setdefault(a, b)
     return dicti
 
-def timeplaces(col, only_legit=False):
+def timeplaces(col, only_legit=False, log=False):
     ''' Make a list of timeplaces from the collection.
     
     :param col: The database collection to query.
@@ -36,18 +38,32 @@ def timeplaces(col, only_legit=False):
     :type only_legit: bool
     '''
     
+    could_be = []
+    cannot_be = []
+    not_legit = []
+    legit = []
+    
     raw = col.find({})
     timeplaces = [doc['timeplace'] for doc in raw if doc['type'] == 'obs']
-    if only_legit:
-        legits = []
-        for doc in timeplaces:
-            tp = col.find({'timeplace': doc})
-            if col.count_documents({'timeplace': doc}) == 16:
-                legits.append(doc)
-        with open('legit_timeplaces.txt', 'w') as lt:
-            for row in legits:
+    if log:
+        for tp in timeplaces:
+            _time = int(tp[-10:])
+            now = int(time.time())
+            if _time < now - 10800*41:
+                if col.count_documents({'timeplace': tp}) == 14:
+                    legit.append(tp)
+                else:
+                    not_legit.append(tp)
+            else:
+                cannot_be.append(tp)
+        with open('legit.txt', 'w') as lt:
+            for row in legit:
                 lt.write(row+'\n')
-        return legits
+        with open('working.txt', 'w') as w:
+            for row in could_be:
+                w.write(row+'\n')
+    if only_legit:
+        return legit
     return timeplaces
 
 def records_to_rows(col, filters={}, limit=100, as_list=False):
@@ -219,7 +235,7 @@ def do_diff_process(col, inst_list=None):
         inst_list = inst_list
     
     # Get all the unique complete timeplaces in the database into a list.
-    legits = timeplaces(col, only_legit=True)
+    legits = timeplaces(col, only_legit=True, log=True, sweep=True)
     
     for tp in legits[:]:
         print(tp)
