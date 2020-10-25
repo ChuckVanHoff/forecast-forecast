@@ -6,7 +6,8 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection, ReturnDocument
 from pymongo.errors import ConnectionFailure, DuplicateKeyError
-from pymongo.errors import InvalidDocument, OperationFailure, ConfigurationError
+from pymongo.errors import InvalidDocument, OperationFailure
+from pymongo.errors import BulkWriteError, ConfigurationError
 
 import config
 
@@ -235,12 +236,12 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
     '''
     
     n = 0
-    count = col.count_documents()
+    count = col.count_documents(filters)
     original = col.find(filters).batch_size(100)
     copy = []
     ### Attempting to wrap this in a while-loop to break it up and save my RAM
     ### and swap memories.
-    while original.is_alive():
+    while original.alive:
         if n+100 <= count:
             ### DO YOU REALLY NEED TO PUT THESE INTO A COPY, OR CAN YOU INSERT
             ### THEM RIGHT OFF THE CURSOR?
@@ -250,33 +251,35 @@ def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
             # Now do everything you need to do to copy the set of documents.
             database = destination_db     # Define database and collection
             collection = destination_col  # for the following operations.
-            destination = dbncol(client, collection, database)
+            destination = dbncol(config.client, collection, database)
             inserted_ids = destination.insert_many(copy).inserted_ids
             if delete == True:
                 # remove all the inserted documents from the origin collection.
-                for item in inserted_ids.values():
-                    filter = {'_id': item}
-                    col.delete_one(filter)
+                for item in inserted_ids:
+                    filt = {'_id': item}
+                    col.delete_one(filt)
         else:
             for item in original[n:]:
                 copy.append(item)
             # Now do everything you need to do to copy the set of documents.
             database = destination_db     # Define database and collection
             collection = destination_col  # for the following operations.
-            destination = dbncol(client, collection, database)
-            inserted_ids = destination.insert_many(copy).inserted_ids
-            if delete == True:
-                # remove all the inserted documents from the origin collection.
-                for item in inserted_ids.values():
-                    filter = {'_id': item}
-                    col.delete_one(filter)
-# 				print(f'MOVED 100 docs from {col} to {destination}.')
-# 			else:
-# 				print(f'COPIED docs in {col} to {destination}.')
-    if delete == True:
-        print(f'MOVED docs from {col} to {destination}.')
-    else:
-        print(f'COPIED docs in {col} to {destination}.')
+            destination = dbncol(config.client, collection, database)
+            try:
+                inserted_ids = destination.insert_many(copy, ordered=False).inserted_ids
+                if delete == True:
+                    # remove all the inserted documents from the origin collection.
+                    for item in inserted_ids:
+                        filt = {'_id': item}
+                        col.delete_one(filt)
+            except BulkWriteError as bwe:
+                with open('bwe_log.txt', 'a') as log:
+                    log.write(time.ctime())
+                    log.write(str(bwe.details))
+#     if delete == True:
+#         print(f'MOVED docs from {col} to {destination}.')
+#     else:
+#         print(f'COPIED docs in {col} to {destination}.')
     return
 ### I know that I am not using this function, but I made a few edits in the 
 ### case that I do need to use it at some time. See above in the un-commented.
