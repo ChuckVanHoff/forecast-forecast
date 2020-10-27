@@ -50,7 +50,7 @@ def timeplaces(col, only_legit=False, log=False):
             _time = int(tp[-10:])
             now = int(time.time())
             if _time < now - 10800*41:
-                if col.count_documents({'timeplace': tp}) == 14:
+                if col.count_documents({'timeplace': tp}) == 41:
                     legit.append(tp)
                 else:
                     not_legit.append(tp)
@@ -235,10 +235,10 @@ def do_diff_process(col, inst_list=None):
         inst_list = inst_list
     
     # Get all the unique complete timeplaces in the database into a list.
-    legits = timeplaces(col, only_legit=True, log=True, sweep=True)
+    legits = timeplaces(col, only_legit=True, log=True)
     
     for tp in legits[:]:
-        print(tp)
+#         print(tp)
         filters = {'timeplace': tp}
         df_list = records_to_rows(col, filters=filters, as_list=True)
         diff_df = make_diff(from_list=df_list, inst_list=inst_list)
