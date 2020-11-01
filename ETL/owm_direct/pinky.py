@@ -46,7 +46,7 @@ def favor(value, floor=10800, trans=False):
         return
     return temp
 
-def party(locations, breaks=True, batch=60, e_r=True):
+def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
     ''' Get data for the locations given in the argument. 
     
     :param locations: the locations to gather data for
