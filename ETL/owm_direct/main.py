@@ -7,4 +7,4 @@ import pinky_pie
 
 hash_list = geo_hash.make()
 locations = geo_hash.decode(hash_list)
-pinky.party(locations[:])
+pinky.party(locations[:111], client=config.remote_client)

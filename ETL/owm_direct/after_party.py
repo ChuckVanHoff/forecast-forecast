@@ -14,8 +14,13 @@ import db_ops
 remote_col = config.remote_client[config.database][config.weathers_collection]
 local_col = config.client[config.database][config.weathers_collection]
 # Load the timeplace record and store it in a defaultdict to be updated.
-with open('timeplace_records.json', 'r') as fp:
-    tprec = json.load(fp)
+try:
+    with open('timeplace_records.json', 'r') as fp:
+        tprec = json.load(fp)
+except:
+    with open('timeplaces_records.json', 'a') as fp:
+        print('Had to create timeplaces_records.json.')
+        tprec = {}
 timeplace_record = defaultdict(int, tprec)
 
 

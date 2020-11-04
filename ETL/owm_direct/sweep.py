@@ -17,12 +17,13 @@ col = db[config.weathers_collection]
 m = 0  # The lower limit of the slice from timeplaces
 n = 0  # The upper limit of the slice from timeplaces
 dels = 0  # The number of documents documented from the database
-l = len(timeplaces) 
+l = 0 
 
 cursor = col.find({})
 test_total = col.count_documents({})
 print(f'Total number of documents to process: {test_total}')
 timeplaces = list(set([doc['timeplace'] for doc in cursor]))
+l = len(timeplaces)
 print(f'Total nuber of timeplaces going into the main loop: {len(timeplaces)}')
 # keep track of the number of timeplaces processed
 while n < l:

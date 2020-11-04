@@ -1,12 +1,3 @@
-''' Carry out the ETL process for OpenWeatherMaps data:
-
-    -request the data through the OWM api
-    -transform it to an instance of Weather
-    -sort it out into instances of Instants
-    -load it to the database: local if not legit, remote if yes, legit
-'''
-
-
 import time
 import json
 import pymongo
@@ -47,8 +38,13 @@ def favor(value, floor=10800, trans=False):
     return temp
 
 def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
-    ''' Get data for the locations given in the argument. 
-    
+    ''' Carry out the ETL process for OpenWeatherMaps data:
+
+    -request the data through the OWM api
+    -transform it to an instance of Weather
+    -sort it out into instances of Instants
+    -load it to the database: local if not legit, remote if yes, legit
+
     :param locations: the locations to gather data for
     :type locations: list of geocoordinate dictionaries
     :param breaks: run the code at reduced speed (written to handle API call
