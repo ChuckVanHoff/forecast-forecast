@@ -16,7 +16,7 @@ def retry(command, *args):
             result = command(*args)
             return result
         except requests.exceptions.ReadTimeout as e:
-            print(f'There was an exception: {e}')
+            print(f'There was an exception in the {n}th cycle: {e}')
             n += 1
     print(f'tried 3 times with {command} and {args}')
     return -1

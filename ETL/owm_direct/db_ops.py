@@ -257,7 +257,7 @@ def copy_docs(col, destination_client, destination_db, destination_col, filters=
         
         # Take the next 100 documents or take all the way to the end.
         if n+100 <= count:
-            for item in original[:n+100]:
+            for item in original[n:n+100]:
                 temp.append(item)
             n += 100
         else:
