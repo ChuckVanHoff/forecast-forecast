@@ -58,6 +58,7 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
     '''
 
     num = len(locations)
+    good_grabs = []
     error_reports = []
     
     db = client[config.database]
@@ -90,6 +91,7 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
                 n += 1
                 forecast = owm_get.forecast(loc)
                 n += 1
+                good_grabs.append(loc)
                 for cast in forecast['list']:
                     data.append(cast)
 
@@ -112,9 +114,6 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
 
                 # Check the API request rate and wait a lil bit if it's high,
                 # otherwise take advantage of the wait time to make_instants.
-# This is a temporary stop until it's functioning more efficiently
-#                 if n/2 / (time.time()-start_time) > 1:
-#                     make_instants.make_instants()
                 if n/2 / (time.time() - start_time) > 1:
                     print(f'waiting {start_time - time.time() + 60} seconds.')
                     time.sleep(start_time - time.time() + 60)
@@ -123,6 +122,11 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
                     print(f'been waiting for something like {time.time() - start_time - 60} seconds.')
                     start_time = time.time()
             i += int(n/2)
+            # Now that the data grab was good and the data load was also good,
+            # record the timeplaces into the progress log.
+            with open('progress_log.txt', 'a') as pl:
+                for loc in good_grabs:
+                    pl.write(str(loc) + '\n')
     else:  # if there are no breaks on the process...
         for loc in locations:
             # Get the forecasts and observations.
