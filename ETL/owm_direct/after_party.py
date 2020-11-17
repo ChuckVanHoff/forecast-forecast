@@ -4,6 +4,7 @@ collection log.
 '''
 
 
+import os
 import json
 from collections import defaultdict
 
@@ -11,8 +12,19 @@ import config
 import db_ops
 
 
+command = 'mongodump --uri=mongodb+srv://chuckvanhoff:Fe7ePrX%215L5Wh6W@cluster0-anhr9.mongodb.net/test'
 remote_col = config.remote_client[config.database][config.weathers_collection]
 local_col = config.client[config.database][config.weathers_collection]
+# This is in case the process did not finish clearing the remote database..
+try:
+    if remote_col.count_documents({}) != 0:
+        os.system(command):
+        print('performed the command.')
+    else:
+        print(f'{remote_col} is empty. Proceding with the weather collection.')
+except:
+    print('there was an exception')
+    pass
 # Load the timeplace record and store it in a defaultdict to be updated.
 try:
     with open('timeplace_records.json', 'r') as fp:
