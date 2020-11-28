@@ -13,7 +13,8 @@ import db_ops
 
 
 timeplace_record = {}
-command = f'mongodump --uri=mongodb+srv://chuckvanhoff:Fe7ePrX%215L5Wh6W@cluster0-anhr9.mongodb.net/'
+command = f'mongodump --uri={config.uri}/{config.database}'
+#mongodb+srv://chuckvanhoff:Fe7ePrX%215L5Wh6W@cluster0-anhr9.mongodb.net/'
 remote_col = config.remote_client[config.database][config.weathers_collection]
 local_col = config.client[config.database][config.weathers_collection]
 
