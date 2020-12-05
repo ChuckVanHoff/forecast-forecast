@@ -5,6 +5,7 @@ collection log.
 
 
 import os
+import subprocess
 import json
 from collections import defaultdict
 
@@ -13,7 +14,7 @@ import db_ops
 
 
 timeplace_record = {}
-command = f'mongodump --uri={config.uri}/{config.database}'
+command = f'mongodump --uri={config.uri}'
 #mongodb+srv://chuckvanhoff:Fe7ePrX%215L5Wh6W@cluster0-anhr9.mongodb.net/'
 remote_col = config.remote_client[config.database][config.weathers_collection]
 local_col = config.client[config.database][config.weathers_collection]
@@ -53,24 +54,31 @@ if __name__ == '__main__':
 #             timeplace_record[timeplace] = 0
     with open('timeplace_record.json', 'w') as rec:
         json.dump(timeplace_record, rec)
-
-    # This is in case the process did not finish clearing the remote database..
+    # Dump the collection and drop it from the remote.
     try:
-        if remote_col.count_documents({}) != 0:
-            os.system(command)
-            print(f'Successfully performed the mongodump command on {remote_col}.')
-#             remote_col.drop()
-#             print('Successfully dropped the remote database.')
+        count = remote_col.count_documents({})
+        if count != 0:
+            print(f'There are {count} documents in {remote_col}')
+#            print('Currently not dumping ro dropping the collection')
+#            if os.system(command):
+            if subprocess.call(command, shell=True) == 0:
+                print('''The os.system() function returned a True, so I am assuming we
+                        Successfully performed the mongodump command.''')
+#            remote_col.drop()
+            print('Did Not drop the remote database.')
         else:
             print(f'Your collection, {remote_col}, was empty at first check.')
     except:
+        # This is in case the process did not finish clearing the remote database..
         print('''There was an exception of some sort in after_party.py.
               Trying to go about it with copy_docs().''')
         db_ops.copy_docs(
             remote_col,
             config.client,
             config.database,
-            config.weathers_collection,
+	    config.weathers_collection,
             filters={},
+
             delete=True
         )
+

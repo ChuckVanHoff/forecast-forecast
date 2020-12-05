@@ -16,10 +16,15 @@ host = config.host
 port = config.port
 uri = config.uri
 
-def check_db_access():
-    '''A check that there is write access to the database'''
- 
-    client = MongoClient(host, port)
+def check_db_access(client):
+    ''' A check that there is write access to the database. '''
+
+
+    db = client.test_db
+    col = db.test_col
+    db_count_pre = 0
+    db_count_poost = 0
+
     
     try:
         client.admin.command('ismaster')
@@ -30,23 +35,31 @@ def check_db_access():
         # Add a database and collection
         # Insert something to the db
         # Get a count of the databases after adding one
-    db_count_pre = len(client.list_database_names())
-    db = client.test_db
-    col = db.test_col
+#     db_count_pre = len(client.list_database_names())
     post = {'name':'Chuck VanHoff',
            'age':'38',
            'hobby':'gardening'
            }
-    col.insert_one(post)
-    db_count_post = len(client.list_database_names())
-    if db_count_pre - db_count_post >= 0:
-        print('Your conneciton is flipped up')
+    if col.insert_one(post):
+        print('You have write access.')
+        # Dump the extra garbage and close out
+        client.drop_database(db)
+#         client.close()
+        return True
     else:
-        print('You have write access')
-    # Dump the extra garbage and close out
-    client.drop_database(db)
-    client.close()
-    return
+#         client.close()
+        return False
+#     db_count_post = len(client.list_database_names())
+#     if db_count_pre - db_count_post >= 0:
+#         print('Your conneciton is flipped up')
+#         check = False
+#     else:
+#         print('You have write access')
+#         check = True
+#     # Dump the extra garbage and close out
+#     client.drop_database(db)
+#     client.close()
+#     return check
 
 def Client(uri):
     ''' Create and return a pymongo MongoClient object. If the uri is given but
