@@ -64,8 +64,8 @@ if __name__ == '__main__':
             if subprocess.call(command, shell=True) == 0:
                 print('''The os.system() function returned a True, so I am assuming we
                         Successfully performed the mongodump command.''')
-#            remote_col.drop()
-            print('Did Not drop the remote database.')
+            remote_col.drop()
+            print('Dropped the remote database, I think, but i"m not sure.')
         else:
             print(f'Your collection, {remote_col}, was empty at first check.')
     except:
