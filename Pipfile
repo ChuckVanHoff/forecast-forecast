@@ -10,6 +10,7 @@ jupyter = "*"
 pandas = "*"
 jupyterlab = "*"
 geohash = "*"
+pymongo = "*"
 
 [requires]
 python_version = "3.7"
