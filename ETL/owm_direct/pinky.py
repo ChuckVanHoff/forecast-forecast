@@ -146,5 +146,5 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
             for row in error_reports:
                 f.write(row)    
     print(f'''Completed pinky party and requested for {i} locations. 
-    It all took {int(time.time() - start_start)} seconds''')
+    It all took {int(time.time() - start_start)} seconds.''')
     return

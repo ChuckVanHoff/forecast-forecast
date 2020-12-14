@@ -18,7 +18,11 @@ uri = config.uri
 
 def check_db_access(client):
     ''' A check that there is write access to the database. '''
-
+    
+###
+### Add some stuff that will check the internet connection, the status of
+### the mongod instance, etc when there is not db access.
+###
 
     db = client.test_db
     col = db.test_col
@@ -26,40 +30,17 @@ def check_db_access(client):
     db_count_poost = 0
 
     
+    # Check on this particular client's write status.
     try:
-        client.admin.command('ismaster')
+        if client.admin.command('ismaster'):
+            print('You have write access!')
+        else:
+            print('According to the docs, this command came from a secondary \
+            member or an arbiter of a replica set. You have no write access.')
     except ConnectionFailure:
         print("Server not available")
-    # check the database connections
-        # Get a count of the databases in the beginning
-        # Add a database and collection
-        # Insert something to the db
-        # Get a count of the databases after adding one
-#     db_count_pre = len(client.list_database_names())
-    post = {'name':'Chuck VanHoff',
-           'age':'38',
-           'hobby':'gardening'
-           }
-    if col.insert_one(post):
-        print('You have write access.')
-        # Dump the extra garbage and close out
-        client.drop_database(db)
-#         client.close()
-        return True
-    else:
-#         client.close()
         return False
-#     db_count_post = len(client.list_database_names())
-#     if db_count_pre - db_count_post >= 0:
-#         print('Your conneciton is flipped up')
-#         check = False
-#     else:
-#         print('You have write access')
-#         check = True
-#     # Dump the extra garbage and close out
-#     client.drop_database(db)
-#     client.close()
-#     return check
+    return True
 
 def Client(uri):
     ''' Create and return a pymongo MongoClient object. If the uri is given but
@@ -78,23 +59,21 @@ def Client(uri):
     if uri:
         try:
             client = MongoClient(uri)
-            return client
         except:
             # Regardless of the error, print the error message and connect to the
             # local MongoDB instance.
-            host = 'localhost'
-            port = 27017
-            client = MongoClient(host=host, port=port)
-            return client
+            print('There was a problem connecting with the uri...going local.')
+            client = MongoClient()
+        return client
     else:
         try:
-            client = MongoClient(host=host, port=port)
+            client = MongoClient()
             return client
         except ConnectionFailure:
             print('caught ConnectionFailure on local server. Returning -1 flag')
             return -1
     
-def dbncol(client, collection, database): ###=database): I don't think this is needed anymore
+def dbncol(client, collection, database):
     ''' Make a connection to the database and collection given in the arguments.
 
     :param client: a MongoClient instance
@@ -192,48 +171,6 @@ def load(data, database, collection, client=config.client):
             client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
 
-### I know that I am not using this function, but I made a few edits in the 
-### case that I do need to use it at some time. See below in the un-commented.
-# def copy_docs(col, destination_db, destination_col, filters={}, delete=False):
-#     ''' Move or copy a collection within and between databases 
-    
-#     :param col: the collection to be copied
-#     :type col: a pymongo collection
-#     :param destination_col: the collection you want the documents copied into
-#     :type destination_col: a pymongo.collection.Collection object
-#     :param destination_db: the database you want the documents copied into
-#     :type destination_db: a pymongo database pymongo.database.Database
-#     :param filters: a filter for the documents to be copied from the collection
-#     By default all collection docs will be copied
-#     :type filters: dict
-#     '''
-
-#     temp_client = MongoClient(host, port)  # temp_client for the destination db
-#     original = col.find(filters).batch_size(100)
-#     copy = []
-#     for item in original:
-#         copy.append(item)
-        
-#     database = destination_db     # Define database and collection
-#     collection = destination_col  # for the following operations.
-#     destination = dbncol(temp_client, collection, database)
-#     inserted_ids = destination.insert_many(copy).inserted_ids
-#     try:
-#         inserted_ids = destination.insert_many(copy).inserted_ids
-#         if delete == True:
-#             # remove all the documents from the original collection
-#             for row in inserted_ids:
-#                 filters = {'_id': row}
-#                 gotit = col.delete_one(filters)
-#                 if not gotit:
-#                     print(f'db_ops.copy_docs....did not delete {row} from {col}.')
-#         else:
-#             client.close()
-#             print(f'COPIED docs in {col} to {destination}.')
-#     except pymongo.errors.BulkWriteError as e:
-#         print(f'The documents have not been copied to {destination_col}.')
-#         print(e)
-#     return
 def copy_docs(col, destination_client, destination_db, destination_col, filters={}, delete=False):
     ''' Move or copy a collection within and between databases.
     
