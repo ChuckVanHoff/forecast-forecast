@@ -13,12 +13,12 @@ import db_ops
 
 hash_list = geo_hash.make()
 locations = geo_hash.decode(hash_list)
-lim = len(locations)
-# lim = 165
+#lim = len(locations)
+lim = 165
 count = 0
 path = 'progress_log.txt'
 dump = f'/usr/local/bin/mongodump --uri={config.uri}'
-restore = f'/usr/local/bin/mongorestore dump'
+restore = f'/usr/local/bin/mongorestore --nsInclude={config.database}.{config.weathers_collection} dump'
 coll = config.remote_client[config.database][config.weathers_collection]
 
 # # Check for a progress log. If there is one, then compare it to the locations
