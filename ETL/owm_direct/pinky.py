@@ -74,7 +74,7 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
             batch = num
 
         start_time = time.time()  # This is for timing the SUB-process.
-        while num - i > 0:
+        while num - i > 0 and (time.time()-start_time) < 9000:
             # This should ensure that the rest of the list is requested and
             # that there is no IndexError caused when [i:i+batch] goes beyond
             # the indexes of locations.
