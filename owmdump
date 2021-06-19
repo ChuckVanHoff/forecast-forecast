@@ -1,0 +1,25 @@
+#! /bin/sh
+#
+# A script to dump MongoDB documents and delete them from the database.
+#
+
+# Create the database variables once and for all.
+uri="mongodb://localhost:27017/?readPreference=primary&appname=MongoDB%20Compass&ssl=false"
+db=owmap_transfer_testing
+collection=weathers_temp
+# Start the main loop fot the script. Read the location and set the query and out options,
+# then dump documents and delete them from the database.
+cat /Users/mastacow/data/forecast-forecast/ETL/owm_direct/latlon_list.txt | while read line
+do
+latlon=$line  # Set the variable to value of the curent line read.
+query={\"location\":$latlon}  # Make a properly formatted query for mongo.
+# Verify that the dump was made, and if it was perform the deletion and log the
+# time and query and results.
+if eval "mongodump --db=$db --collection=$collection --query='$query' --out='/Volumes/Brians8GMemory/$db/$latlon'"# >> dumplog.txt
+then
+date >> dumplog.txt
+echo $query >> dumplog.txt
+mongo $db --eval "db.weathers_temp.deleteMany($query)" >> dumplog.txt
+echo '\n' >> dumplog.txt
+fi
+done
