@@ -75,6 +75,11 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
 
         start_time = time.time()  # This is for timing the SUB-process.
         while num - i > 0 and (time.time()-start_time) < 9000:
+            # Stop the collection process to make way for the dump and restore.
+            if (time.time()-start_time) > 9000:
+                print(f'''Data collection timeout has occured after
+                {time.time()-start_time} seconds of operation.''')
+                break
             # This should ensure that the rest of the list is requested and
             # that there is no IndexError caused when [i:i+batch] goes beyond
             # the indexes of locations.
