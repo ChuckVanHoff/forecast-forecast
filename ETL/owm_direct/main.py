@@ -13,12 +13,12 @@ import db_ops
 
 hash_list = geo_hash.make()
 locations = geo_hash.decode(hash_list)
-#lim = len(locations)
-lim = 165
+lim = len(locations)
+# lim = 165
 count = 0
 path = 'progress_log.txt'
-dump = f'/usr/local/bin/mongodump --uri={config.uri}'
-restore = f'/usr/local/bin/mongorestore --nsInclude={config.database}.{config.weathers_collection} dump'
+dump = f'/usr/local/bin/mongodump --uri={config.uri} --out=/Volumes/Memorex\ USB/'
+restore = f'/usr/local/bin/mongorestore --nsInclude={config.database}.{config.weathers_collection} /Volumes/Memorex\ USB/owm/'
 coll = config.remote_client[config.database][config.weathers_collection]
 
 # # Check for a progress log. If there is one, then compare it to the locations
@@ -105,9 +105,13 @@ if __name__ == '__main__':
             result = os.system(dump)
             if result == 0:
                 print('dumped the collection. Now restoring it to the local.')
-                os.system(restore)
-                # GET A CHECK FOR COMMAND SUCCESS
-                print('I think the collection was restored. Now dropping col.')
+                ### GET A CHECK FOR COMMAND SUCCESS ###
+                result = os.system(restore)
+                if result == 0:
+                    print('I think the collection was restored. Now dropping col.')
+                else:
+                    print(f'The restore failed... system result was {result}.')
+                ### GET A CHECK FOR COMMAND SUCCESS ###
                 coll.drop()
                 try:
                     num = coll.count_documents({})
