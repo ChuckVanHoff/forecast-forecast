@@ -55,6 +55,8 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load
     free API keys.
     :param e_r: give error reports or pass over them
     :type e_r: bool
+    :param load_raw: load data raw or edit it before loading
+    :type load_raw: bool
     '''
 
     num = len(locations)
