@@ -37,7 +37,7 @@ def favor(value, floor=10800, trans=False):
         return
     return temp
 
-def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
+def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load_raw=False):
     ''' Carry out the ETL process for OpenWeatherMaps data:
 
     -request the data through the OWM api
@@ -94,11 +94,15 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
                 # of api requests with n.
                 data.append(owm_get.current(loc))
                 n += 1
-                forecast = owm_get.forecast(loc)
-                n += 1
+                if load_raw:
+                    data.append(owm_get.forecast(loc))
+                    n += 1
+                else:
+                    forecast = owm_get.forecast(loc)
+                    n += 1
+                    for cast in forecast['list']:
+                        data.append(cast)
                 good_grabs.append(loc)
-                for cast in forecast['list']:
-                    data.append(cast)
 
             # At this point you may have requested more than 60 times per
             # API key. Check the number, then check the requests/min rate;
