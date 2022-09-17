@@ -27,17 +27,16 @@ def forecast(location, as_df=False):
     result = api_handles.retry(requests.get, url).json()
     if result == -1:
         result = {'loc': location, 'time': time.ctime()}
-#     result = requests.get(url).json()
-    elif as_df:
+        return result
+    # Add the field 'instant', and others, to the data set.
+    result['location'] = location
+    result['dt'] = time.time()
+    result['instant'] = pinky.favor(result['dt'])
+    result['type'] = 'cast'
+    result['timeplace'] = f'{geo_hash.encode(location)}{result["instant"]}'
+    result['tt_inst'] = result['dt'] - int(time.time())
+    if as_df:
         result = pd.json_normalize(result)
-    else:
-        # Add the field 'instant' to each data set in the forecast.
-        for item in result['list']:
-            item['location'] = location
-            item['instant'] = pinky.favor(item['dt'])
-            item['type'] = 'cast'
-            item['timeplace'] = f'{geo_hash.encode(location)}{item["instant"]}'
-            item['tt_inst'] = item['dt'] - int(time.time())
     return result
 
 def current(location, as_df=False):
@@ -57,14 +56,15 @@ def current(location, as_df=False):
     result = api_handles.retry(requests.get, url).json()
     if result == -1:
         result = {'loc': location, 'time': time.ctime()}
-#     result = requests.get(url).json()
-    elif as_df:
-        result = pd.json_normalize(result)
+        return result
     else:
+        # Add some fields to the data to be used in analysis.
         result['location'] = location
         result['instant'] = pinky.favor(result['dt'])
         result['type'] = 'obs'
         result['timeplace'] = f'{geo_hash.encode(location)}{result["instant"]}'
         result['tt_inst'] = result['dt'] - int(time.time())
+    if as_df:
+        result = pd.json_normalize(result)
     return result
     
