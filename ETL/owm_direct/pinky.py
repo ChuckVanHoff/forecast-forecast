@@ -22,7 +22,7 @@ def favor(value, floor=10800, trans=False):
     :param trans: Determines if value will be transformed or not. If trans is 
     True, then value will be changed and nothing will be returned, otherwise
     value stays the same and the nearest floor value will be returned.
-    :type trans: bool --Default is True
+    :type trans: bool --Default is False
     '''
 
     this_floor = floor * (value//floor)
