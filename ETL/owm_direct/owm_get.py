@@ -34,7 +34,7 @@ def forecast(location, as_df=False):
     result['instant'] = pinky.favor(result['dt'])
     result['type'] = 'cast'
     result['timeplace'] = f'{geo_hash.encode(location)}{result["instant"]}'
-    result['tt_inst'] = result['dt'] - int(time.time())
+    result['tt_inst'] = result['instant'] - int(time.time())
     if as_df:
         result = pd.json_normalize(result)
     return result
