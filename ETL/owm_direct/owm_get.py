@@ -23,18 +23,16 @@ def forecast(location, as_df=False):
     
     lat = location['lat']
     lon = location['lon']
-    url = f'http://api.openweathermap.org/data/2.5/forecast?lat={location["lat"]}&lon={location["lon"]}&appid={cast_key}'
+    url = f'http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={cast_key}'
+
     result = api_handles.retry(requests.get, url).json()
     if result == -1:
         result = {'loc': location, 'time': time.ctime()}
         return result
-    # Add the field 'instant', and others, to the data set.
+    # Add these fields to the data to be used in analysis.
     result['location'] = location
-    result['dt'] = time.time()
-    result['instant'] = pinky.favor(result['dt'])
+    result['dt'] = int(time.time())
     result['type'] = 'cast'
-    result['timeplace'] = f'{geo_hash.encode(location)}{result["instant"]}'
-    result['tt_inst'] = result['instant'] - int(time.time())
     if as_df:
         result = pd.json_normalize(result)
     return result
@@ -51,19 +49,15 @@ def current(location, as_df=False):
     
     lat = location['lat']
     lon = location['lon']
-    url = f'http://api.openweathermap.org/data/2.5/weather?lat={location["lat"]}&lon={location["lon"]}&appid={obs_key}'
+    url = f'http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={obs_key}'
   
     result = api_handles.retry(requests.get, url).json()
     if result == -1:
         result = {'loc': location, 'time': time.ctime()}
         return result
-    else:
-        # Add some fields to the data to be used in analysis.
-        result['location'] = location
-        result['instant'] = pinky.favor(result['dt'])
-        result['type'] = 'obs'
-        result['timeplace'] = f'{geo_hash.encode(location)}{result["instant"]}'
-        result['tt_inst'] = result['dt'] - int(time.time())
+    # Add some fields to the data to be used in analysis.
+    result['location'] = location
+    result['type'] = 'obs'
     if as_df:
         result = pd.json_normalize(result)
     return result
