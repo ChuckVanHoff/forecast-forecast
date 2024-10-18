@@ -96,8 +96,17 @@ def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=Fa
                 # of api requests with n.
                 data.append(owm_get.current(loc))
                 n += 1
-                forecast = owm_get.forecast(loc)
-                n += 1
+                # The "if" loads the response as it is given, and the "then"
+                # separates the series of forecasted times into individuals
+                # before loading them to the database.
+                if load_raw:
+                    data.append(owm_get.forecast(loc))
+                    n += 1
+                else:
+                    forecast = owm_get.forecast(loc)
+                    n += 1
+                    for cast in forecast['list']:
+                        data.append(cast)
                 good_grabs.append(loc)
                 for cast in forecast['list']:
                     data.append(cast)
