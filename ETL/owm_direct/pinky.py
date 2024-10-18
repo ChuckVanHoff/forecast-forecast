@@ -129,14 +129,20 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
             i += int(n/2)
             # Now that the data grab was good and the data load was also good,
             # record the timeplaces into the progress log.
-            with open('progress_log.txt', 'a') as pl:
+            with open(path, 'a') as pl:
                 for loc in good_grabs:
                     pl.write(str(loc) + '\n')
+            # Now clear the good_grabs list so that the progress log does not 
+            # get duplicate locations.
+            good_grabs = []
     else:  # if there are no breaks on the process...
         for loc in locations:
             # Get the forecasts and observations.
             data.append(owm_get.current(loc))
             forecast = owm_get.forecast(loc)
+            if load_raw:
+                data.append(forecast)
+                continue
             for cast in forecast['list']:
                 data.append(cast)
         # Load it to the database
