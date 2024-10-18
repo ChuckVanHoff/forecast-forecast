@@ -11,15 +11,16 @@ import pinky
 import db_ops
 
 
-hash_list = geo_hash.make()
-locations = geo_hash.decode(hash_list)
-lim = len(locations)
-# lim = 165
 count = 0
-path = 'progress_log.txt'
-dump = f'/usr/local/bin/mongodump --uri={config.uri} --out=/Volumes/Memorex\ USB/'
-restore = f'/usr/local/bin/mongorestore --nsInclude={config.database}.{config.weathers_collection} /Volumes/Memorex\ USB/owm/'
-coll = config.remote_client[config.database][config.weathers_collection]
+hash_list = [] # a list of geohash coordinates
+locations =  [] # a list of lat-lon coordinatesgeo_hash.decode(hash_list)
+path = str # this is the progress log file name
+lim = int # the number of locations requested from the list of locatoins
+max_tries = int  # Limit the number of tries to complete the process.
+dump = str # the shell command to execute a database dump operation
+restore = str # the shell command to execute a mongorestore operation
+client = object # an instance of pymongo.MongoClient()
+coll = object # the database and collection
 
 # # Check for a progress log. If there is one, then compare it to the locations
 # # list and throw out all the ones that are on the progress list, then finish
@@ -56,14 +57,22 @@ coll = config.remote_client[config.database][config.weathers_collection]
 
 
 if __name__ == '__main__':
+    # Set the variables
+    hash_list = geo_hash.make()
+    locations = geo_hash.decode(hash_list)
+    path = 'progress_log.txt'
+    lim = config.limit
+    max_tries = 5
+    dump = f'/usr/local/bin/mongodump --db={config.database}'
+    restore = f'/usr/local/bin/mongorestore --db={config.database} /Volumes/forecast\ data/owm_10052024/'
+    client = config.client
+    coll = client[config.database][config.weathers_collection]
     
-    # Start a loop that will continue until all the locations have been requested
+    # Start a loop that will continue until all locations have been requested
     # for, making sure that when an error occurs that is not handled otherwise
     # the pinky party restarts where is last had a success.
-    count = 0
-    print(f'count = {count}, lim = {lim}')
-    while count < lim:
-        if db_ops.check_db_access(config.remote_client):
+    while count < max_tries: 
+        if db_ops.check_db_access(client):
             # If there is a progress log, open it and remove all the locations
             # from locations that are in the progress log.
             if os.path.exists(path):  # Checking this in case there was an
