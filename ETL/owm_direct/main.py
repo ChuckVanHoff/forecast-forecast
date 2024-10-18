@@ -89,7 +89,8 @@ if __name__ == '__main__':
                     print('Started new progress log.')
             # Do the process now with all the values remaining in locaitons.
             try:
-                pinky.party(locations[:lim], client=config.remote_client)
+                pinky.party(locations[:lim], client=client, load_raw=True)
+                os.remove(path)  # Delete the progress log.
                 break
             except KeyboardInterrupt:
                 break
