@@ -63,8 +63,8 @@ def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=Fa
     good_grabs = []
     error_reports = []
     
-    db = client[config.database]
-    weathers_col = db[config.weathers_collection]
+    db = client[database]
+    col = db[collection]
     
     print('Lets get this party started!!')
     start_start = time.time()  # This is for timing the WHOLE process.
@@ -105,12 +105,12 @@ def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=Fa
             # At this point you may have requested more than 60 times per
             # API key. Check the number, then check the requests/min rate;
             # if the rate is over 1request/second start loading the data
-            # to the database.
+            # to the database
             if n >= batch * 2:
                 if n/2 / (time.time()-start_time) > 1: 
                     if isinstance(data, list):
                         try:
-                            result = weathers_col.insert_many(data, ordered=False)
+                            result = col.insert_many(data, ordered=False)
                         except pymongo.errors.BulkWriteError as e:
                             for item in e.details['writeErrors']:
                                 report = {item['errmsg'], item['op']}
@@ -149,7 +149,7 @@ def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=Fa
                 data.append(cast)
         # Load it to the database
         if isinstance(data, list):
-            weathers_col.insert_many(data)
+            col.insert_many(data)
         else:
             print(type(weathers), 'doing nothing')
     
