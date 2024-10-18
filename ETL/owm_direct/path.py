@@ -31,4 +31,3 @@ def add_parent_to_path():
     parentdir = os.path.dirname(currentdir)
     sys.path.insert(0, parentdir) 
 
-# def add_chil_to_path()
