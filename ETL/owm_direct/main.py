@@ -112,32 +112,38 @@ if __name__ == '__main__':
     # Check the database to be sure the data was loaded, then try to dump it.
     # If the dump was a success, run a restore command so that the data will
     # not be overwritten during the next dump. then try to drop it.
-    if coll.count_documents({}) > 0:
-        try:
-            print('just about to try to give the mongodump command from main.py')
-            result = os.system(dump)
-            if result == 0:
-                print('dumped the collection. Now restoring it to the local.')
-                ### GET A CHECK FOR COMMAND SUCCESS ###
-                result = os.system(restore)
-                if result == 0:
-                    print('I think the collection was restored. Now dropping col.')
-                else:
-                    print(f'The restore failed... system result was {result}.')
-                ### GET A CHECK FOR COMMAND SUCCESS ###
-                coll.drop()
-                try:
-                    num = coll.count_documents({})
-                    if num == 0:
-                        print('dropped the collection')
-                    else:
-                        print(f'There are still {num} docs in the collection.')
-                except:
-                    print('Check the oplog to see that coll was restored.')
-                os.remove(path)  # Drop the progress log file.
-            else:
-                print(f'''it did not return anything from the command. I was 
-                        expecting a true/false return.
-                        result = {result}''')
-        except:
-            print('just got an error in main.py while trying to dump and drop')
+    # doc_count = coll.count_documents({})
+    # if doc_count > 0:
+    #     print(doc_count)
+    #     try:
+    #         os.system(dump) # This should typically dump from the remote client
+    #                         # to local storage.
+            # result = client[config.database][config.weathers_collection].count_documents({})
+#             if result == 0:
+#                 print('dumped the collection. Now restoring it to the local.')
+#                 os.system(restore) # This should typically restore from a local
+#                                     # storage to a local mongo database.
+#                 ### GET A CHECK FOR COMMAND SUCCESS ###
+#                 if result == 0:
+#                     print('I think the collection was restored. Now dropping col.')
+#                 else:
+#                     print(f'The restore failed... system result was {result}.')
+#                 ### GET A CHECK FOR COMMAND SUCCESS ###
+
+#                 coll.drop()
+#                 try:
+#                     num = coll.count_documents({})
+#                     if num == 0:
+#                         print('dropped the collection')
+#                     else:
+#                         print(f'There are still {num} docs in the collection.')
+#                 except:
+#                     print('Check the oplog to see that coll was restored.')
+#             else:
+#                 print(f'''it did not return anything from the command. I was
+#                         expecting a true/false return.
+#                         result = {result}''')
+        # except:
+        #     print('just got an error in main.py while trying to dump and drop')
+    else:
+        print(f'at end of main.py, and there were no documents in the checked collection {coll}')
