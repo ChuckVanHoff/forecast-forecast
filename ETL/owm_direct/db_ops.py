@@ -14,7 +14,11 @@ import config
 
 host = config.host
 port = config.port
-uri = config.uri
+client = config.client
+try:
+    uri = config.uri
+except:
+    print('db_ops.py tried to execute "uri = config.uri"  and got an error.')
 
 def check_db_access(client):
     ''' A check that there is write access to the database. '''
