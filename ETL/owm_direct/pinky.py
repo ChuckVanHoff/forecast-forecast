@@ -1,16 +1,18 @@
+
 import time
 import json
 import pymongo
 from pymongo import MongoClient
 
-import owm_get
-import geo_hash
-import make_instants
 import config
+import owm_get
+import make_instants
 
 
-client = MongoClient()
-
+database = config.database
+collection = config.collection
+client = config.client
+path = 'progress_log.txt'
 
 def favor(value, floor=10800, trans=False):
     ''' Find the nearest floor multiple to the value.
