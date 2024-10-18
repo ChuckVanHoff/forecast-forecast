@@ -39,7 +39,7 @@ def favor(value, floor=10800, trans=False):
         return
     return temp
 
-def party(locations, breaks=True, batch=60, e_r=True, client=config.client):
+def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=False):
     ''' Carry out the ETL process for OpenWeatherMaps data:
 
     -request the data through the OWM api
