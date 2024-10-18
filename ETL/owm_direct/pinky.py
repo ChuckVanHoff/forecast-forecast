@@ -130,7 +130,7 @@ def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=Fa
 
                 # Check the API request rate and wait a lil bit if it's high,
                 # otherwise take advantage of the wait time to make_instants.
-                if n/2 / (time.time() - start_time) > 1:
+                if n/2 / (time.time() - start_time) > 1 and num - n/2 > 59:
                     print(f'waiting {start_time - time.time() + 60} seconds.')
                     time.sleep(start_time - time.time() + 60)
                     start_time = time.time()
