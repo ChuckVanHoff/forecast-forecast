@@ -99,11 +99,14 @@ if __name__ == '__main__':
                 if result == 0:
                     print('mongodump complete. Dropping the collection and continuing with the party :)')
                     coll.drop()
-            except:
-                print('Got error. Restarting pinky.    from the end of the log file.')
-                # Incriment the counter before continuing the loop at the last element.
-                for line in open(path, 'r'):
+                    # os.remove(path)  # Delete the progress log.
                     count += 1
+                    continue
+            except:
+                print('Got an unanticipated error. Restarting pinky from end of log file.')
+                count += 1
+                continue
+            count += 1
         else:
             print("you have no db access!")
     # Check the database to be sure the data was loaded, then try to dump it.
