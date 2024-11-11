@@ -131,3 +131,14 @@ instants.csv
 /Users/chuckvanhoff/data/forcast-forcast/sorted*txt
 sorted_cast_log.txt
 sorted_obs_log.txt
+progress_log.txt
+legit.txt
+timeplace_record.json
+working.txt
+ETL/owm_direct/_ids.txt
+ETL/owm_direct/all_ids.txt
+ETL/owm_direct/delete_these_ids.txt
+ETL/owm_direct/error_reports.txt
+ETL/owm_direct/timeplaces.txt
+dumplog.txt
+
