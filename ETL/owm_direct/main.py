@@ -145,5 +145,6 @@ if __name__ == '__main__':
 #                         result = {result}''')
         # except:
         #     print('just got an error in main.py while trying to dump and drop')
-    else:
-        print(f'at end of main.py, and there were no documents in the checked collection {coll}')
+#    else:
+#        print(f'at end of main.py, and there were no documents in the checked collection {coll}')
+

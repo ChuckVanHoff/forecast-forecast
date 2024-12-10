@@ -23,7 +23,8 @@ def forecast(location, as_df=False):
     
     lat = location['lat']
     lon = location['lon']
-    url = f'http://api.openweathermap.org/data/2.5/forecast?lat={location["lat"]}&lon={location["lon"]}&appid={cast_key}'
+    url = f'http://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={cast_key}'
+
     result = api_handles.retry(requests.get, url).json()
     if result == -1:
         result = {'loc': location, 'time': time.ctime()}
@@ -34,7 +35,6 @@ def forecast(location, as_df=False):
     result['instant'] = pinky.favor(result['dt'])
     result['type'] = 'cast'
     result['timeplace'] = f'{geo_hash.encode(location)}{result["instant"]}'
-    result['tt_inst'] = result['instant'] - int(time.time())
     if as_df:
         result = pd.json_normalize(result)
     return result
@@ -51,7 +51,7 @@ def current(location, as_df=False):
     
     lat = location['lat']
     lon = location['lon']
-    url = f'http://api.openweathermap.org/data/2.5/weather?lat={location["lat"]}&lon={location["lon"]}&appid={obs_key}'
+    url = f'http://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={obs_key}'
   
     result = api_handles.retry(requests.get, url).json()
     if result == -1:
