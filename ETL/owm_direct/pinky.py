@@ -1,16 +1,18 @@
+
 import time
 import json
 import pymongo
 from pymongo import MongoClient
 
-import owm_get
-import geo_hash
-import make_instants
 import config
+import owm_get
+import make_instants
 
 
-client = MongoClient()
-
+database = config.database
+collection = config.collection
+client = config.client
+path = 'progress_log.txt'
 
 def favor(value, floor=10800, trans=False):
     ''' Find the nearest floor multiple to the value.
@@ -22,7 +24,7 @@ def favor(value, floor=10800, trans=False):
     :param trans: Determines if value will be transformed or not. If trans is 
     True, then value will be changed and nothing will be returned, otherwise
     value stays the same and the nearest floor value will be returned.
-    :type trans: bool --Default is True
+    :type trans: bool --Default is False
     '''
 
     this_floor = floor * (value//floor)
@@ -37,7 +39,7 @@ def favor(value, floor=10800, trans=False):
         return
     return temp
 
-def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load_raw=False):
+def party(locations, breaks=True, batch=60, e_r=True, client=client, load_raw=False):
     ''' Carry out the ETL process for OpenWeatherMaps data:
 
     -request the data through the OWM api
@@ -63,8 +65,8 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load
     good_grabs = []
     error_reports = []
     
-    db = client[config.database]
-    weathers_col = db[config.weathers_collection]
+    db = client[database]
+    col = db[collection]
     
     print('Lets get this party started!!')
     start_start = time.time()  # This is for timing the WHOLE process.
@@ -96,6 +98,9 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load
                 # of api requests with n.
                 data.append(owm_get.current(loc))
                 n += 1
+                # The "if" loads the response as it is given, and the "then"
+                # separates the series of forecasted times into individuals
+                # before loading them to the database.
                 if load_raw:
                     data.append(owm_get.forecast(loc))
                     n += 1
@@ -109,12 +114,12 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load
             # At this point you may have requested more than 60 times per
             # API key. Check the number, then check the requests/min rate;
             # if the rate is over 1request/second start loading the data
-            # to the database.
+            # to the database
             if n >= batch * 2:
                 if n/2 / (time.time()-start_time) > 1: 
                     if isinstance(data, list):
                         try:
-                            result = weathers_col.insert_many(data, ordered=False)
+                            result = col.insert_many(data, ordered=False)
                         except pymongo.errors.BulkWriteError as e:
                             for item in e.details['writeErrors']:
                                 report = {item['errmsg'], item['op']}
@@ -125,7 +130,7 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load
 
                 # Check the API request rate and wait a lil bit if it's high,
                 # otherwise take advantage of the wait time to make_instants.
-                if n/2 / (time.time() - start_time) > 1:
+                if n/2 / (time.time() - start_time) > 1 and num - n/2 > 59:
                     print(f'waiting {start_time - time.time() + 60} seconds.')
                     time.sleep(start_time - time.time() + 60)
                     start_time = time.time()
@@ -135,19 +140,25 @@ def party(locations, breaks=True, batch=60, e_r=True, client=config.client, load
             i += int(n/2)
             # Now that the data grab was good and the data load was also good,
             # record the timeplaces into the progress log.
-            with open('progress_log.txt', 'a') as pl:
+            with open(path, 'a') as pl:
                 for loc in good_grabs:
                     pl.write(str(loc) + '\n')
+            # Now clear the good_grabs list so that the progress log does not 
+            # get duplicate locations.
+            good_grabs = []
     else:  # if there are no breaks on the process...
         for loc in locations:
             # Get the forecasts and observations.
             data.append(owm_get.current(loc))
             forecast = owm_get.forecast(loc)
+            if load_raw:
+                data.append(forecast)
+                continue
             for cast in forecast['list']:
                 data.append(cast)
         # Load it to the database
         if isinstance(data, list):
-            weathers_col.insert_many(data)
+            col.insert_many(data)
         else:
             print(type(weathers), 'doing nothing')
     

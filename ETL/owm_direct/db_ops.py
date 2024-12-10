@@ -14,7 +14,11 @@ import config
 
 host = config.host
 port = config.port
-uri = config.uri
+client = config.client
+try:
+    uri = config.uri
+except:
+    print('db_ops.py tried to execute "uri = config.uri"  and got an error.')
 
 def check_db_access(client):
     ''' A check that there is write access to the database. '''
@@ -24,12 +28,6 @@ def check_db_access(client):
 ### the mongod instance, etc when there is not db access.
 ###
 
-    db = client.test_db
-    col = db.test_col
-    db_count_pre = 0
-    db_count_poost = 0
-
-    
     # Check on this particular client's write status.
     try:
         if client.admin.command('ismaster'):
@@ -119,7 +117,7 @@ def read_mongo_to_dict(collection, query={}, limit=None):
         cursor = collection.find(query).batch_size(100)
     return {curs.pop('_id'): curs for curs in cursor}
 
-def load(data, database, collection, client=config.client):
+def load(data, database, collection, client=client):
     ''' Load data to specified database collection. Also checks for a
     preexisting document with the same instant and zipcode, and updates it in
     the case that there was already one there.
@@ -165,8 +163,9 @@ def load(data, database, collection, client=config.client):
         try:
             filters = {'zipcode':data['zipcode'], 'instant':data['instant']}
             updates = {'$set': {'forecasts': data}} # append to forecasts list
+            result = col.find_one_and_update(filters, updates,  upsert=True)
             client.close()
-            return col.find_one_and_update(filters, updates,  upsert=True)
+            return result
         except DuplicateKeyError:
             client.close()
             return(f'DuplicateKeyError, could not insert data to {collection}')
